@@ -1,221 +1,357 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import './App.css';
+import './enhancements.css';
+import './simplified.css';
 
-/**
- * Storynexis - Interactive Story Writing AI
- * Two-state interface: Initial setup → Writing mode with story generation
- * Currently using demo mode (mock AI) until backend is ready
- */
+const tonePalette = {
+  Dark: '#4b2d5c',
+  Emotional: '#c95a7d',
+  Humorous: '#f4a259',
+  Inspirational: '#2fbf71',
+  Mysterious: '#5c7aea',
+  Adaptive: '#4c5fd5',
+  Opening: '#4c5fd5',
+  Default: '#4c5fd5',
+};
+
+const genrePalette = {
+  Fantasy: '#8b5cf6',
+  Romance: '#ff7dac',
+  Horror: '#ff6b6b',
+  'Science Fiction': '#22d3ee',
+  Mystery: '#c084fc',
+  Adventure: '#f0abfc',
+  Default: '#f472b6',
+};
+
+const getToneColor = (tone) => tonePalette[tone] || tonePalette.Default;
+
 function App() {
-  // View state management
-  const [currentView, setCurrentView] = useState('initial'); // 'initial' or 'writing'
-  
-  // Initial story setup
+  const [currentView, setCurrentView] = useState('initial');
   const [genre, setGenre] = useState('');
   const [storyTitle, setStoryTitle] = useState('');
   const [openingLine, setOpeningLine] = useState('');
-  
-  // Story content
-  const [storyContent, setStoryContent] = useState('');
-  
-  // Continuation controls
+  const [storyBeats, setStoryBeats] = useState([]);
   const [tone, setTone] = useState('');
   const [length, setLength] = useState('');
   const [resultCount, setResultCount] = useState('');
-  const [continuationIdea, setContinuationIdea] = useState('');
-  
-  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [generatedOptions, setGeneratedOptions] = useState([]);
-  
-  // Backend API endpoint - currently in demo mode
-  const DEMO_MODE = true; // Set to false when backend is ready
+  const API_URL = 'http://localhost:8000';
 
-  /**
-   * Generate demo continuation options
-   */
-  const generateDemoContinuations = (count) => {
-    const continuations = [
-      `The ${tone.toLowerCase() || 'mysterious'} atmosphere deepened as shadows danced across the walls. Every step forward revealed new secrets waiting to be uncovered, drawing our protagonist deeper into the heart of the mystery.`,
-      
-      `With a sudden burst of ${tone.toLowerCase() || 'emotional'} energy, the character realized that everything they believed was about to change. The journey ahead would test not just their strength, but their very understanding of reality itself.`,
-      
-      `${length === 'Long' ? 'As the hours turned into days, and the days into weeks, the story unfolded with intricate detail. Each moment built upon the last, creating a tapestry of events that would forever alter the course of destiny. Characters emerged from the shadows, each with their own tales to tell, their own burdens to bear. The world expanded, revealing layers of complexity that had been hidden beneath the surface, waiting for the right moment to be revealed.' : 'The story took an unexpected turn, challenging everything that had come before.'}`
-    ];
-    
-    return continuations.slice(0, parseInt(count));
-  };
+  const fullStoryText = storyBeats.map((beat) => beat.text).join('\n\n');
 
-  /**
-   * Start the story - transition from initial to writing view
-   */
-  const handleStartStory = () => {
-    if (!genre || !storyTitle || !openingLine) {
-      setError('Please complete all fields before starting your story.');
+  const stats = useMemo(() => {
+    const cleanStory = fullStoryText.trim();
+    const wordCount = cleanStory ? cleanStory.split(/\s+/).length : 0;
+    const lastBeat = storyBeats[storyBeats.length - 1];
+
+    return {
+      chapters: storyBeats.length,
+      words: wordCount,
+      lastUpdated: lastBeat ? new Date(lastBeat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--',
+    };
+  }, [storyBeats, fullStoryText]);
+
+  // Simplified - removed idea bank feature
+
+  const handleStartStory = async () => {
+    const trimmedTitle = storyTitle.trim();
+    const trimmedOpening = openingLine.trim();
+
+    if (!genre || !trimmedTitle) {
+      setError('Please select genre and enter story title.');
       return;
     }
-    
-    setStoryContent(openingLine);
-    setCurrentView('writing');
-    setError(null);
-  };
 
-  /**
-   * Generate continuation options
-   */
-  const handleGenerateContinuation = async () => {
-    if (!tone || !length || !resultCount) {
-      setError('Please select tone, length, and number of results.');
-      return;
-    }
-    
     setError(null);
     setLoading(true);
-    
+
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Generate opening using AI if user didn't provide one
+      let finalOpening = trimmedOpening;
       
-      const options = generateDemoContinuations(resultCount);
-      setGeneratedOptions(options);
-      setShowModal(true);
+      if (!trimmedOpening) {
+        // Build prompt for generating opening
+        const prompt = `Write an engaging opening paragraph for a ${genre} story titled "${trimmedTitle}". Create an atmospheric beginning that hooks the reader.`;
+
+        const response = await fetch(`${API_URL}/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            tone: 'Adaptive',
+            length: 'Short',
+            count: 1,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const options = await response.json();
+        finalOpening = options[0].text;
+        setOpeningLine(finalOpening);
+      }
+
+      const openingBeat = {
+        id: Date.now().toString(),
+        text: finalOpening,
+        tone: 'Opening',
+        length: 'Intro',
+        inspiration: null,
+        timestamp: new Date().toISOString(),
+      };
+
+      setStoryBeats([openingBeat]);
+      setStoryTitle(trimmedTitle);
+      setCurrentView('writing');
+      setError(null);
     } catch (err) {
-      setError('Failed to generate continuations. Please try again.');
+      console.error('Generation error:', err);
+      setError(`Failed to generate opening: ${err.message}. Make sure the backend is running.`);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Choose a continuation option and add to story
-   */
-  const handleChooseContinuation = (option) => {
-    setStoryContent(prev => prev + '\n\n' + option);
-    
-    // Reset continuation controls
-    setTone('');
-    setLength('');
-    setResultCount('');
-    setContinuationIdea('');
-    
-    setShowModal(false);
-  };
+  const handleGenerateContinuation = async () => {
+    if (!tone || !length || !resultCount) {
+      setError('Please select tone, length, and number of results.');
+      return;
+    }
 
-  /**
-   * Save the story book as a text file
-   */
-  const handleSaveBook = () => {
-    const content = `Title: ${storyTitle}\nGenre: ${genre}\n\n${storyContent}`;
-    const blob = new Blob([content], { type: 'text/plain' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${storyTitle.replace(/\s+/g, '_')}.txt`;
-    link.click();
-  };
+    setError(null);
+    setLoading(true);
+    
+    // Show progress indicator
+    const startTime = Date.now();
 
-  /**
-   * Start a new book
-   */
-  const handleNewBook = () => {
-    if (window.confirm('Your current book may not be saved. Do you wish to continue?')) {
-      // Reset all state
-      setCurrentView('initial');
-      setGenre('');
-      setStoryTitle('');
-      setOpeningLine('');
-      setStoryContent('');
-      setTone('');
-      setLength('');
-      setResultCount('');
+    const requestCount = parseInt(resultCount, 10) || 1;
+    const trimmedIdea = continuationIdea.trim();
+    if (trimmedIdea) {
+      registerIdea(trimmedIdea);
+    }
+
+    try {
+      // Build the prompt from the current story context
+      const contextPrompt = fullStoryText || openingLine || `A ${genre} story titled "${storyTitle}"`;
+      const ideaPrompt = trimmedIdea ? ` ${trimmedIdea}` : '';
+      const fullPrompt = `${contextPrompt}${ideaPrompt}\n\n`;
+
+      // Call the backend API
+      const response = await fetch(`${API_URL}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: fullPrompt,
+          tone: tone,
+          length: length,
+          count: requestCount,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const options = await response.json();
+      
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`✓ Generated ${options.length} option(s) in ${elapsed}s`);
+
+      setGeneratedOptions(options);
+      setShowModal(true);
       setContinuationIdea('');
-      setError(null);
+    } catch (err) {
+      console.error('Generation error:', err);
+      setError(`Failed to generate continuations: ${err.message}. Make sure the backend is running on port 8000.`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>📖 Storynexis</h1>
-        <p>AI-Powered Interactive Story Writing</p>
-        {DEMO_MODE && (
-          <div className="demo-badge">Demo Mode - AI Simulation Active</div>
-        )}
-      </header>
+  const handleChooseContinuation = (option) => {
+    const beat = {
+      id: Date.now().toString(),
+      text: option.text,
+      tone: option.tone,
+      length: option.length,
+      inspiration: option.idea,
+      timestamp: new Date().toISOString(),
+    };
 
-      {/* ========= STATE 1: INITIAL SCREEN ========= */}
+    setStoryBeats((prev) => [...prev, beat]);
+    setTone('');
+    setLength('');
+    setResultCount('');
+    setGeneratedOptions([]);
+    setShowModal(false);
+  };
+
+  const handleSaveBook = () => {
+    const content = `Title: ${storyTitle}\nGenre: ${genre}\n\n${fullStoryText || 'Your story is waiting to be written.'}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${storyTitle.replace(/\s+/g, '_') || 'story'}.txt`;
+    link.click();
+  };
+
+  const handleNewBook = () => {
+    if (!window.confirm('Your current book may not be saved. Do you wish to continue?')) return;
+
+    setCurrentView('initial');
+    setGenre('');
+    setStoryTitle('');
+    setOpeningLine('');
+    setStoryBeats([]);
+    setTone('');
+    setLength('');
+    setResultCount('');
+    setGeneratedOptions([]);
+    setShowModal(false);
+    setError(null);
+  };
+
+  const genreAccent = genrePalette[genre] || genrePalette.Default;
+
+  const renderInsightPanel = () => (
+    <section className="insight-panel">
+      <div className="insight-card">
+        <span>📝 Words</span>
+        <strong>{stats.words}</strong>
+      </div>
+      <div className="insight-card">
+        <span>📚 Chapters</span>
+        <strong>{stats.chapters}</strong>
+      </div>
+    </section>
+  );
+
+  const renderStory = () => (
+    <section className="story-panel">
+      <div className="story-header">
+        <h2>{storyTitle}</h2>
+        <span className="genre-badge" style={{ backgroundColor: genreAccent }}>{genre}</span>
+      </div>
+      <div className="story-content">
+        {storyBeats.map((beat, index) => (
+          <div key={beat.id} className="story-paragraph">
+            {beat.text}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+  return (
+    <div className="app-wrapper">
+      {/* Title Bar / Navigation */}
+      <nav className="title-bar">
+        <div className="title-bar-content">
+          <div className="brand">
+            <span className="brand-icon">📖</span>
+            <span className="brand-name">Storynexis</span>
+            {currentView === 'writing' && genre && (
+              <span className="nav-genre" style={{ backgroundColor: genreAccent }}>
+                {genre}
+              </span>
+            )}
+          </div>
+          <div className="nav-info">
+            {currentView === 'writing' && (
+              <>
+                <div className="nav-stat">
+                  <span className="stat-value">{stats.chapters}</span>
+                  <span className="stat-label">Chapters</span>
+                </div>
+                <div className="nav-stat">
+                  <span className="stat-value">{stats.words}</span>
+                  <span className="stat-label">Words</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      <div className="app-container">
       {currentView === 'initial' && (
         <div className="initial-screen">
-          <div className="center-card">
-            <h2>Start Your Story</h2>
-
-            <div className="form-group">
-              <label>Genre</label>
-              <select 
-                value={genre} 
-                onChange={(e) => setGenre(e.target.value)}
-                className="form-select"
-              >
-                <option value="">Select genre</option>
-                <option value="Fantasy">Fantasy</option>
-                <option value="Romance">Romance</option>
-                <option value="Horror">Horror</option>
-                <option value="Science Fiction">Science Fiction</option>
-                <option value="Mystery">Mystery</option>
-                <option value="Adventure">Adventure</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Story Title</label>
-              <input
-                type="text"
-                value={storyTitle}
-                onChange={(e) => setStoryTitle(e.target.value)}
-                placeholder="Enter story title..."
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Opening Line</label>
-              <textarea
-                value={openingLine}
-                onChange={(e) => setOpeningLine(e.target.value)}
-                placeholder="Once upon a time..."
-                rows="4"
-                className="form-textarea"
-              />
-            </div>
-
-            {error && <div className="error-message">{error}</div>}
-
-            <button onClick={handleStartStory} className="btn-primary btn-full">
-              Start Story
-            </button>
+          <div className="hero-decoration">
+            <div className="floating-icon">✨</div>
+            <div className="floating-icon">📚</div>
+            <div className="floating-icon">🖋️</div>
+            <div className="floating-icon">💫</div>
           </div>
+          <h2>Create Your Story</h2>
+          <p className="lead-text">Transform your imagination into captivating narratives. Let AI be your co-writer in crafting unforgettable stories.</p>
+
+          <div className="form-group">
+            <label>Genre</label>
+            <select value={genre} onChange={(e) => setGenre(e.target.value)} className="form-select">
+              <option value="">Select genre</option>
+              <option value="Fantasy">Fantasy</option>
+              <option value="Romance">Romance</option>
+              <option value="Horror">Horror</option>
+              <option value="Science Fiction">Science Fiction</option>
+              <option value="Mystery">Mystery</option>
+              <option value="Adventure">Adventure</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Story Title</label>
+            <input
+              type="text"
+              value={storyTitle}
+              onChange={(e) => setStoryTitle(e.target.value)}
+              placeholder="Enter story title..."
+              className="form-input"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Opening Line <span style={{color: '#9ca3af', fontWeight: 'normal', fontSize: '0.85rem'}}>(Optional - AI will generate if blank)</span></label>
+            <textarea
+              value={openingLine}
+              onChange={(e) => setOpeningLine(e.target.value)}
+              placeholder="Leave blank to let AI generate an opening, or write your own..."
+              rows="4"
+              className="form-textarea"
+            />
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button onClick={handleStartStory} className="btn-primary btn-full" disabled={loading}>
+            {loading ? '🎬 Generating Opening...' : 'Start Story'}
+          </button>
         </div>
       )}
 
-      {/* ========= STATE 2: WRITING SCREEN ========= */}
       {currentView === 'writing' && (
-        <div className="writing-screen">
-          <div className="writing-layout">
-            
-            {/* LEFT: CONTROLS */}
-            <div className="controls-panel">
-              <div className="panel-card">
-                <h3>Continue Story</h3>
-                <p className="hint">Tone, length & results required. Idea optional.</p>
+        <>
+          {renderInsightPanel()}
 
+          {renderStory()}
+
+          <div className="controls-panel">
+            <div className="controls-card">
+              <h3>Continue Your Story</h3>
+              
+              <div className="controls-grid">
                 <div className="form-group">
                   <label>Tone</label>
-                  <select 
-                    value={tone} 
-                    onChange={(e) => setTone(e.target.value)}
-                    className="form-select"
-                  >
+                  <select value={tone} onChange={(e) => setTone(e.target.value)} className="form-select">
                     <option value="">Select tone</option>
                     <option value="Dark">Dark</option>
                     <option value="Emotional">Emotional</option>
@@ -226,12 +362,8 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Story Length</label>
-                  <select 
-                    value={length} 
-                    onChange={(e) => setLength(e.target.value)}
-                    className="form-select"
-                  >
+                  <label>Length</label>
+                  <select value={length} onChange={(e) => setLength(e.target.value)} className="form-select">
                     <option value="">Select length</option>
                     <option value="Short">Short</option>
                     <option value="Medium">Medium</option>
@@ -240,68 +372,35 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Number of Results</label>
-                  <select 
-                    value={resultCount} 
-                    onChange={(e) => setResultCount(e.target.value)}
-                    className="form-select"
-                  >
+                  <label>Options</label>
+                  <select value={resultCount} onChange={(e) => setResultCount(e.target.value)} className="form-select">
                     <option value="">Select number</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
+                    <option value="1">1 option</option>
+                    <option value="2">2 options</option>
+                    <option value="3">3 options</option>
                   </select>
                 </div>
-
-                <div className="form-group">
-                  <label>Your Next Line / Idea (optional)</label>
-                  <textarea
-                    value={continuationIdea}
-                    onChange={(e) => setContinuationIdea(e.target.value)}
-                    placeholder="Optional guidance..."
-                    rows="3"
-                    className="form-textarea"
-                  />
-                </div>
-
-                {error && <div className="error-message">{error}</div>}
-
-                <button 
-                  onClick={handleGenerateContinuation} 
-                  disabled={loading}
-                  className="btn-success btn-full"
-                >
-                  {loading ? 'Generating...' : 'Generate Continuation'}
-                </button>
               </div>
-            </div>
 
-            {/* RIGHT: BOOK VIEW */}
-            <div className="book-panel">
-              <div className="book-actions">
+              {error && <div className="error-message">{error}</div>}
+
+              <button onClick={handleGenerateContinuation} disabled={loading} className="btn-primary btn-full">
+                {loading ? '✨ AI is writing your story...' : '✨ Generate Continuation'}
+              </button>
+
+              <div className="action-buttons">
                 <button onClick={handleSaveBook} className="btn-outline">
-                  💾 Save Book
+                  💾 Save Story
                 </button>
-                <button onClick={handleNewBook} className="btn-outline-danger">
-                  ➕ New Book
+                <button onClick={handleNewBook} className="btn-outline">
+                  ➕ New Story
                 </button>
-              </div>
-
-              <h3>📘 Story Book</h3>
-
-              <div className="book-view">
-                <div className="book-title">{storyTitle}</div>
-                <div className="book-genre">{genre}</div>
-                <hr />
-                <div className="book-content">{storyContent}</div>
               </div>
             </div>
-
           </div>
-        </div>
+        </>
       )}
 
-      {/* ========= MODAL: CONTINUATION OPTIONS ========= */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -312,15 +411,19 @@ function App() {
               </button>
             </div>
             <div className="modal-body">
-              <div className={`options-grid options-${resultCount}`}>
-                {generatedOptions.map((option, index) => (
-                  <div key={index} className="option-card">
-                    <p className="option-text">{option}</p>
-                    <button 
-                      onClick={() => handleChooseContinuation(option)}
-                      className="btn-success"
-                    >
-                      Choose
+              <div className={`options-grid options-${generatedOptions.length || 1}`}>
+                {generatedOptions.map((option) => (
+                  <div key={option.id} className="option-card">
+                    <div className="option-meta">
+                      <span className="tone-pill" style={{ backgroundColor: getToneColor(option.tone) }}>
+                        {option.tone}
+                      </span>
+                      <span className="length-chip">{option.length}</span>
+                    </div>
+                    <p className="option-text">{option.text}</p>
+                    {option.idea && <p className="idea-hint">Inspired by "{option.idea}"</p>}
+                    <button onClick={() => handleChooseContinuation(option)} className="btn-success">
+                      Use this beat
                     </button>
                   </div>
                 ))}
@@ -329,6 +432,31 @@ function App() {
           </div>
         </div>
       )}
+    </div>
+
+    {/* Footer Bar */}
+    <footer className="footer-bar">
+      <div className="footer-content">
+        <div className="footer-section">
+          <span className="footer-label">Storynexis v1.0</span>
+          <span className="footer-divider">•</span>
+          <span className="footer-text">Interactive Story Writing Platform</span>
+        </div>
+        <div className="footer-section">
+          {currentView === 'writing' && (
+            <>
+              <span className="footer-text">Last saved: {stats.lastUpdated}</span>
+              <span className="footer-divider">•</span>
+            </>
+          )}
+          <span className="footer-text">Built with React & Vite</span>
+          <span className="footer-divider">•</span>
+          <a href="https://github.com/Aditya2987/-Storynexis" target="_blank" rel="noopener noreferrer" className="footer-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </footer>
     </div>
   );
 }

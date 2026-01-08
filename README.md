@@ -1,10 +1,12 @@
 # 📖 Storynexis
 
-**Storynexis** is an AI-powered interactive story writing platform built with React. Create compelling narratives with intelligent AI assistance that generates multiple story continuation options based on your chosen tone, length, and style.
+**Storynexis** is an AI-powered interactive story writing platform built with React and a Python FastAPI backend. Create compelling narratives with intelligent AI assistance using a pretrained GPT-2 model that generates multiple story continuation options based on your chosen tone, length, and style.
 
-![Demo Mode](https://img.shields.io/badge/Status-Demo%20Mode-yellow)
+![Status](https://img.shields.io/badge/Status-Active-green)
 ![React](https://img.shields.io/badge/React-19.2.3-blue)
 ![Vite](https://img.shields.io/badge/Vite-7.2.4-purple)
+![Python](https://img.shields.io/badge/Python-3.9+-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115.6-green)
 
 ## ✨ Features
 
@@ -44,24 +46,45 @@ git clone https://github.com/Aditya2987/-Storynexis.git
 cd Storynexis
 ```
 
-2. **Navigate to Frontend directory**
+2. **Backend Setup**
 ```bash
-cd Frontend
+cd Backend
+python -m venv venv
+.\venv\Scripts\activate  # On Windows
+pip install -r requirements.txt
 ```
 
-3. **Install dependencies**
+3. **Frontend Setup**
 ```bash
+cd ../Frontend
 npm install
 ```
 
-4. **Start development server**
+4. **Start the servers**
+
+Terminal 1 (Backend):
 ```bash
+cd Backend
+.\venv\Scripts\activate
+python main.py
+```
+
+Terminal 2 (Frontend):
+```bash
+cd Frontend
 npm run dev
+```
+
+Or use the startup script:
+```powershell
+.\start.ps1
 ```
 
 5. **Open your browser**
 ```
-http://localhost:5173
+Frontend: http://localhost:5173
+Backend API: http://localhost:8000
+API Docs: http://localhost:8000/docs
 ```
 
 ## 🎯 How to Use
@@ -91,11 +114,22 @@ http://localhost:5173
 
 ## 🛠️ Tech Stack
 
-- **Frontend Framework**: React 19.2.3
-- **Build Tool**: Vite 7.2.4
-- **Language**: JavaScript (JSX)
-- **Styling**: Pure CSS with custom designs
-- **State Management**: React Hooks (useState)
+**Frontend:**
+- React 19.2.3
+- Vite 7.2.4
+- JavaScript (JSX)
+- Pure CSS
+
+**Backend:**
+- Python 3.9+
+- FastAPI 0.115.6
+- PyTorch 2.5.1
+- Transformers 4.47.1
+
+**AI Model:**
+- Qwen2.5-3B-Instruct (3 billion parameters)
+- Advanced instruction-tuned language model from Alibaba Cloud
+- Model: [Qwen/Qwen2.5-3B-Instruct](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
 
 ## 📁 Project Structure
 
@@ -112,8 +146,13 @@ Storynexis/
 │   ├── index.html           # HTML template
 │   ├── package.json         # Dependencies
 │   └── vite.config.js       # Vite configuration
-├── Backend/                 # (Future backend integration)
-├── Model/                   # (Future AI model integration)
+├── Backend/
+│   ├── main.py              # FastAPI server with model inference
+│   ├── requirements.txt     # Python dependencies
+│   └── README.md            # Backend documentation
+├── Model/
+│   └── fiction_story_generator/  # Pretrained GPT-2 model
+├── start.ps1                # Startup script for both servers
 └── README.md
 ```
 
