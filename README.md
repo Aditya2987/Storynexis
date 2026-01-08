@@ -1,25 +1,28 @@
 # 📖 Storynexis
 
-**Storynexis** is an AI-powered interactive story writing platform built with React and a Python FastAPI backend. Create compelling narratives with intelligent AI assistance using a pretrained GPT-2 model that generates multiple story continuation options based on your chosen tone, length, and style.
+**Storynexis** is an AI-powered interactive story writing platform built with React and Python FastAPI backend. Create compelling narratives with intelligent AI assistance using the Qwen2.5-1.5B-Instruct model that generates multiple story continuation options based on your chosen tone, length, and style.
 
 ![Status](https://img.shields.io/badge/Status-Active-green)
 ![React](https://img.shields.io/badge/React-19.2.3-blue)
 ![Vite](https://img.shields.io/badge/Vite-7.2.4-purple)
-![Python](https://img.shields.io/badge/Python-3.9+-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115.6-green)
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.128.0-green)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.5.1-red)
 
 ## ✨ Features
 
 ### 🎭 Story Creation
 - **Genre Selection**: Choose from Fantasy, Romance, Horror, Science Fiction, Mystery, and Adventure
-- **Custom Opening**: Write your own story opening line
-- **Beautiful Book View**: Read your story in an elegant, book-like interface with serif fonts
+- **Auto-Generate Opening**: AI generates compelling opening if left blank
+- **Modern UI**: Full-screen glassmorphism design with deep purple creative theme
+- **Floating Creative Icons**: Animated storytelling elements enhance the experience
 
 ### 🤖 AI-Powered Continuation
 - **Multiple Options**: Generate 1-3 continuation options per request
-- **Tone Control**: Select from Dark, Emotional, Humorous, Inspirational, or Mysterious tones
-- **Length Selection**: Choose Short, Medium, or Long continuations
+- **Tone Control**: Select from Dark, Emotional, Humorous, Inspirational, Mysterious, or Adaptive tones
+- **Length Selection**: Choose Short (2-3s), Medium (3-4s), or Long (5-7s) continuations
 - **Optional Guidance**: Provide your own ideas to guide the AI
+- **GPU Acceleration**: CUDA-enabled for fast generation (20-30% faster than 3B model)
 
 ### 💾 Story Management
 - **Save to File**: Download your completed story as a `.txt` file
@@ -42,30 +45,56 @@
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/Aditya2987/-Storynexis.git
+git clone https://github.com/Aditya2987/Storynexis.git
 cd Storynexis
 ```
 
-2. **Backend Setup**
+2. **Download the AI Model**
+
+The model is not included in the repository due to its size (3.1GB). Download it using one of these methods:
+
+**Option A: Using Hugging Face CLI (Recommended)**
+```bash
+pip install huggingface-hub
+huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --local-dir Model/Qwen2.5-1.5B-Instruct
+```
+
+**Option B: Using Python Script**
+```python
+from huggingface_hub import snapshot_download
+snapshot_download(
+    repo_id="Qwen/Qwen2.5-1.5B-Instruct",
+    local_dir="Model/Qwen2.5-1.5B-Instruct"
+)
+```
+
+3. **Backend Setup (GPU-accelerated)**
 ```bash
 cd Backend
-python -m venv venv
-.\venv\Scripts\activate  # On Windows
+python -m venv venv_gpu
+.\venv_gpu\Scripts\activate  # On Windows
 pip install -r requirements.txt
 ```
 
-3. **Frontend Setup**
+4. **Frontend Setup**
 ```bash
 cd ../Frontend
 npm install
 ```
 
-4. **Start the servers**
+5. **Start the servers**
+
+**Option A: Use the Startup Script (Recommended)**
+```powershell
+.\start.ps1
+```
+
+**Option B: Manual Start**
 
 Terminal 1 (Backend):
 ```bash
 cd Backend
-.\venv\Scripts\activate
+.\venv_gpu\Scripts\activate
 python main.py
 ```
 
@@ -75,14 +104,9 @@ cd Frontend
 npm run dev
 ```
 
-Or use the startup script:
-```powershell
-.\start.ps1
+6. **Open your browser**
 ```
-
-5. **Open your browser**
-```
-Frontend: http://localhost:5173
+Frontend: http://localhost:5173 (or :5174)
 Backend API: http://localhost:8000
 API Docs: http://localhost:8000/docs
 ```
@@ -121,61 +145,70 @@ API Docs: http://localhost:8000/docs
 - Pure CSS
 
 **Backend:**
-- Python 3.9+
-- FastAPI 0.115.6
-- PyTorch 2.5.1
-- Transformers 4.47.1
+- Python 3.11
+- FastAPI 0.128.0
+- PyTorch 2.5.1+cu121 (CUDA 12.1)
+- Transformers 4.57.3
+- GPU Acceleration with NVIDIA CUDA
 
 **AI Model:**
-- Qwen2.5-3B-Instruct (3 billion parameters)
+- Qwen2.5-1.5B-Instruct (1.5 billion parameters)
 - Advanced instruction-tuned language model from Alibaba Cloud
-- Model: [Qwen/Qwen2.5-3B-Instruct](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
+- Optimized for speed: 2-7 second generation times with GPU
+- Model: [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
 
 ## 📁 Project Structure
 
 ```
 Storynexis/
 ├── Frontend/
-│   ├── public/
-│   │   └── vite.svg
+│   ├── public/              # Static assets
 │   ├── src/
-│   │   ├── App.jsx          # Main application component
-│   │   ├── App.css          # Application styles
+│   │   ├── App.jsx          # Main React component
+│   │   ├── App.css          # Glassmorphism & animations
+│   │   ├── simplified.css   # Story panel styling
 │   │   ├── main.jsx         # Entry point
 │   │   └── index.css        # Global styles
 │   ├── index.html           # HTML template
-│   ├── package.json         # Dependencies
+│   ├── package.json         # Node dependencies
 │   └── vite.config.js       # Vite configuration
 ├── Backend/
-│   ├── main.py              # FastAPI server with model inference
+│   ├── main.py              # FastAPI server with GPU inference
 │   ├── requirements.txt     # Python dependencies
-│   └── README.md            # Backend documentation
+│   └── venv_gpu/            # GPU-enabled virtual environment
 ├── Model/
-│   └── fiction_story_generator/  # Pretrained GPT-2 model
-├── start.ps1                # Startup script for both servers
+│   ├── Qwen2.5-1.5B-Instruct/  # AI model (download separately)
+│   └── Readme.md            # Model information
+├── start.ps1                # Automated startup script
+├── USAGE_GUIDE.md           # Comprehensive usage documentation
+├── .gitignore               # Git ignore rules
 └── README.md
 ```
 
 ## 🔮 Future Enhancements
 
-- [ ] **Backend Integration**: Connect to Django/FastAPI backend
-- [ ] **Real AI Model**: Integrate with GPT, Claude, or custom LLM
 - [ ] **User Authentication**: Save stories to user accounts
 - [ ] **Story History**: Browse and edit previous stories
 - [ ] **Collaborative Writing**: Multi-user story creation
 - [ ] **Export Formats**: PDF, EPUB, DOCX support
-- [ ] **Story Templates**: Pre-built story structures
+- [ ] **Story Templates**: Pre-built story structures and prompts
 - [ ] **Character Management**: Track characters and their development
 - [ ] **Plot Analysis**: AI-powered story structure insights
+- [ ] **Cloud Deployment**: Host on AWS/Azure with scalable GPU backend
+- [ ] **Streaming Responses**: Real-time token streaming for better UX
 
-## 🎨 Demo Mode
+## 📖 Documentation
 
-Currently, Storynexis runs in **demo mode** with simulated AI responses. The continuations are generated based on your selected tone and length preferences, providing a realistic preview of the full AI-powered experience.
+For detailed usage instructions, troubleshooting, and API documentation, see [USAGE_GUIDE.md](USAGE_GUIDE.md)
 
-To connect a real backend:
-1. Set `DEMO_MODE = false` in `App.jsx`
-2. Configure your API endpoint
-3. Implement the backend API handler
+## ⚙️ System Requirements
+
+- **Python**: 3.9 or higher (3.11 recommended)
+- **Node.js**: 16.x or higher
+- **RAM**: 4GB minimum (8GB recommended)
+- **GPU**: NVIDIA GPU with 3GB+ VRAM for GPU acceleration (optional but recommended)
+- **Disk Space**: ~3.5GB (3.1GB for model + dependencies)
+- **OS**: Windows 10/11 (macOS and Linux compatible with adjustments)
 
 ## 🤝 Contributing
 
