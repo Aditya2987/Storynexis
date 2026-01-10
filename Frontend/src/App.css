@@ -421,12 +421,12 @@ body {
 }
 
 .center-card {
-  background: var(--surface-glass);
-  padding: 40px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow), 0 0 0 1px rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
   max-width: 600px;
   width: 100%;
   transition: var(--transition);
@@ -445,8 +445,8 @@ body {
 }
 
 .center-card:hover {
-  box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255, 255, 255, 0.6);
-  transform: translateY(-2px);
+  box-shadow: none;
+  transform: none;
 }
 
 .center-card h2 {
@@ -680,12 +680,12 @@ body {
 }
 
 .insight-card {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(20px);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  border-radius: 0;
   padding: 24px;
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -693,10 +693,10 @@ body {
 }
 
 .insight-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+  border-color: transparent;
 }
 
 .insight-card span {

@@ -53,12 +53,12 @@
 }
 
 .controls-card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 32px;
-  box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(10px);
+  background: transparent;
+  border-radius: 0;
+  padding: 32px 0;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
 }
 
 .controls-card h3 {

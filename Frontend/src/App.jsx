@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import './App.css';
 import './enhancements.css';
 import './simplified.css';
+import './improved-ui.css';
 
 const tonePalette = {
   Dark: '#4b2d5c',
@@ -35,11 +36,17 @@ function App() {
   const [tone, setTone] = useState('');
   const [length, setLength] = useState('');
   const [resultCount, setResultCount] = useState('');
+  const [continuationIdea, setContinuationIdea] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [generatedOptions, setGeneratedOptions] = useState([]);
   const API_URL = 'http://localhost:8000';
+
+  // Simple idea tracking (no-op for now, can be enhanced later)
+  const registerIdea = (idea) => {
+    console.log('Idea registered:', idea);
+  };
 
   const fullStoryText = storyBeats.map((beat) => beat.text).join('\n\n');
 
@@ -295,46 +302,86 @@ function App() {
           <h2>Create Your Story</h2>
           <p className="lead-text">Transform your imagination into captivating narratives. Let AI be your co-writer in crafting unforgettable stories.</p>
 
-          <div className="form-group">
-            <label>Genre</label>
-            <select value={genre} onChange={(e) => setGenre(e.target.value)} className="form-select">
-              <option value="">Select genre</option>
-              <option value="Fantasy">Fantasy</option>
-              <option value="Romance">Romance</option>
-              <option value="Horror">Horror</option>
-              <option value="Science Fiction">Science Fiction</option>
-              <option value="Mystery">Mystery</option>
-              <option value="Adventure">Adventure</option>
-            </select>
+          <div className="center-card">
+            <div className="form-group">
+              <label htmlFor="genre-select">Genre *</label>
+              <select 
+                id="genre-select"
+                value={genre} 
+                onChange={(e) => setGenre(e.target.value)} 
+                className={`form-select ${error && !genre ? 'error' : genre ? 'success' : ''}`}
+                aria-required="true"
+                aria-describedby="genre-help"
+              >
+                <option value="">Select genre</option>
+                <option value="Fantasy">Fantasy</option>
+                <option value="Romance">Romance</option>
+                <option value="Horror">Horror</option>
+                <option value="Science Fiction">Science Fiction</option>
+                <option value="Mystery">Mystery</option>
+                <option value="Adventure">Adventure</option>
+              </select>
+              <small id="genre-help" style={{color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginTop: '6px', display: 'block'}}>
+                Choose the genre that best fits your story
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="title-input">Story Title *</label>
+              <input
+                id="title-input"
+                type="text"
+                value={storyTitle}
+                onChange={(e) => setStoryTitle(e.target.value)}
+                placeholder="Enter an engaging title for your story..."
+                className={`form-input ${error && !storyTitle.trim() ? 'error' : storyTitle.trim() ? 'success' : ''}`}
+                aria-required="true"
+                aria-describedby="title-help"
+                maxLength={100}
+              />
+              <small id="title-help" style={{color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginTop: '6px', display: 'block'}}>
+                {storyTitle.length}/100 characters
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="opening-input">
+                Opening Line 
+                <span style={{color: 'rgba(255,255,255,0.6)', fontWeight: 'normal', fontSize: '0.85rem', marginLeft: '8px'}}>
+                  (Optional - AI will generate if blank)
+                </span>
+              </label>
+              <textarea
+                id="opening-input"
+                value={openingLine}
+                onChange={(e) => setOpeningLine(e.target.value)}
+                placeholder="Leave blank to let AI generate an opening, or write your own captivating first line..."
+                rows="4"
+                className="form-textarea"
+                aria-describedby="opening-help"
+                maxLength={500}
+              />
+              <small id="opening-help" style={{color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginTop: '6px', display: 'block'}}>
+                {openingLine.length}/500 characters
+              </small>
+            </div>
+
+            {error && <div className="error-message" role="alert">{error}</div>}
+
+            <button 
+              onClick={handleStartStory} 
+              className="btn-primary btn-full" 
+              disabled={loading}
+              aria-label={loading ? 'Generating story opening' : 'Start your story'}
+            >
+              {loading ? (
+                <>
+                  <span className="loading-spinner-enhanced" style={{display: 'inline-block', width: '20px', height: '20px', marginRight: '8px', verticalAlign: 'middle'}}></span>
+                  🎬 Generating Opening...
+                </>
+              ) : '✨ Start Your Story'}
+            </button>
           </div>
-
-          <div className="form-group">
-            <label>Story Title</label>
-            <input
-              type="text"
-              value={storyTitle}
-              onChange={(e) => setStoryTitle(e.target.value)}
-              placeholder="Enter story title..."
-              className="form-input"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Opening Line <span style={{color: '#9ca3af', fontWeight: 'normal', fontSize: '0.85rem'}}>(Optional - AI will generate if blank)</span></label>
-            <textarea
-              value={openingLine}
-              onChange={(e) => setOpeningLine(e.target.value)}
-              placeholder="Leave blank to let AI generate an opening, or write your own..."
-              rows="4"
-              className="form-textarea"
-            />
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <button onClick={handleStartStory} className="btn-primary btn-full" disabled={loading}>
-            {loading ? '🎬 Generating Opening...' : 'Start Story'}
-          </button>
         </div>
       )}
 
@@ -350,30 +397,48 @@ function App() {
               
               <div className="controls-grid">
                 <div className="form-group">
-                  <label>Tone</label>
-                  <select value={tone} onChange={(e) => setTone(e.target.value)} className="form-select">
+                  <label htmlFor="tone-select">Tone *</label>
+                  <select 
+                    id="tone-select"
+                    value={tone} 
+                    onChange={(e) => setTone(e.target.value)} 
+                    className={`form-select ${error && !tone ? 'error' : ''}`}
+                    aria-required="true"
+                  >
                     <option value="">Select tone</option>
-                    <option value="Dark">Dark</option>
-                    <option value="Emotional">Emotional</option>
-                    <option value="Humorous">Humorous</option>
-                    <option value="Inspirational">Inspirational</option>
-                    <option value="Mysterious">Mysterious</option>
+                    <option value="Dark">🌑 Dark</option>
+                    <option value="Emotional">💔 Emotional</option>
+                    <option value="Humorous">😄 Humorous</option>
+                    <option value="Inspirational">✨ Inspirational</option>
+                    <option value="Mysterious">🔮 Mysterious</option>
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>Length</label>
-                  <select value={length} onChange={(e) => setLength(e.target.value)} className="form-select">
+                  <label htmlFor="length-select">Length *</label>
+                  <select 
+                    id="length-select"
+                    value={length} 
+                    onChange={(e) => setLength(e.target.value)} 
+                    className={`form-select ${error && !length ? 'error' : ''}`}
+                    aria-required="true"
+                  >
                     <option value="">Select length</option>
-                    <option value="Short">Short</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Long">Long</option>
+                    <option value="Short">📝 Short (~50 words)</option>
+                    <option value="Medium">📄 Medium (~100 words)</option>
+                    <option value="Long">📖 Long (~150 words)</option>
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>Options</label>
-                  <select value={resultCount} onChange={(e) => setResultCount(e.target.value)} className="form-select">
+                  <label htmlFor="count-select">Options *</label>
+                  <select 
+                    id="count-select"
+                    value={resultCount} 
+                    onChange={(e) => setResultCount(e.target.value)} 
+                    className={`form-select ${error && !resultCount ? 'error' : ''}`}
+                    aria-required="true"
+                  >
                     <option value="">Select number</option>
                     <option value="1">1 option</option>
                     <option value="2">2 options</option>
@@ -382,17 +447,35 @@ function App() {
                 </div>
               </div>
 
-              {error && <div className="error-message">{error}</div>}
+              {error && <div className="error-message" role="alert">{error}</div>}
 
-              <button onClick={handleGenerateContinuation} disabled={loading} className="btn-primary btn-full">
-                {loading ? '✨ AI is writing your story...' : '✨ Generate Continuation'}
+              <button 
+                onClick={handleGenerateContinuation} 
+                disabled={loading} 
+                className="btn-primary btn-full"
+                aria-label={loading ? 'AI is generating story continuation' : 'Generate story continuation'}
+              >
+                {loading ? (
+                  <>
+                    <span className="loading-spinner-enhanced" style={{display: 'inline-block', width: '20px', height: '20px', marginRight: '8px', verticalAlign: 'middle'}}></span>
+                    ✨ AI is writing your story...
+                  </>
+                ) : '✨ Generate Continuation'}
               </button>
 
               <div className="action-buttons">
-                <button onClick={handleSaveBook} className="btn-outline">
+                <button 
+                  onClick={handleSaveBook} 
+                  className="btn-outline"
+                  aria-label="Save your story to a text file"
+                >
                   💾 Save Story
                 </button>
-                <button onClick={handleNewBook} className="btn-outline">
+                <button 
+                  onClick={handleNewBook} 
+                  className="btn-outline"
+                  aria-label="Start a new story"
+                >
                   ➕ New Story
                 </button>
               </div>
@@ -402,17 +485,27 @@ function App() {
       )}
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div 
+          className="modal-overlay" 
+          onClick={() => setShowModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Choose Continuation</h3>
-              <button onClick={() => setShowModal(false)} className="modal-close">
+              <h3 id="modal-title">Choose Your Story Continuation</h3>
+              <button 
+                onClick={() => setShowModal(false)} 
+                className="modal-close"
+                aria-label="Close modal"
+              >
                 ×
               </button>
             </div>
             <div className="modal-body">
               <div className={`options-grid options-${generatedOptions.length || 1}`}>
-                {generatedOptions.map((option) => (
+                {generatedOptions.map((option, index) => (
                   <div key={option.id} className="option-card">
                     <div className="option-meta">
                       <span className="tone-pill" style={{ backgroundColor: getToneColor(option.tone) }}>
@@ -421,9 +514,13 @@ function App() {
                       <span className="length-chip">{option.length}</span>
                     </div>
                     <p className="option-text">{option.text}</p>
-                    {option.idea && <p className="idea-hint">Inspired by "{option.idea}"</p>}
-                    <button onClick={() => handleChooseContinuation(option)} className="btn-success">
-                      Use this beat
+                    {option.idea && <p className="idea-hint">💡 Inspired by "{option.idea}"</p>}
+                    <button 
+                      onClick={() => handleChooseContinuation(option)} 
+                      className="btn-success"
+                      aria-label={`Select option ${index + 1}`}
+                    >
+                      ✓ Use this continuation
                     </button>
                   </div>
                 ))}
