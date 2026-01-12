@@ -8,6 +8,11 @@ __pycache__/
 *$py.class
 *.so
 
+# Firebase credentials - NEVER commit these!
+firebase-credentials.json
+Backend/firebase-credentials.json
+**/firebase-credentials.json
+
 # Node modules
 node_modules/
 Frontend/node_modules/

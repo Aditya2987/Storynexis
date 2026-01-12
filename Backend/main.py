@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -6,6 +6,59 @@ import torch
 from typing import Optional, List
 from contextlib import asynccontextmanager
 import os
+from firebase_auth import initialize_firebase, get_current_user
+import re
+
+def clean_and_complete_text(text):
+    """Clean generated text and ensure it ends with complete sentences."""
+    if not text:
+        return text
+    
+    # Remove any meta-commentary or instructions that leaked through
+    unwanted_patterns = [
+        r'^(Here\'s|Here is|I\'ll|Let me|Continuing|The story continues).*?:\s*',
+        r'\n\s*\[.*?\]\s*$',
+        r'\n\s*\(.*?\)\s*$',
+        r'---+.*$',
+    ]
+    for pattern in unwanted_patterns:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.DOTALL)
+    
+    text = text.strip()
+    
+    # Check if text ends with proper punctuation
+    if text and text[-1] in '.!?"\'':
+        return text
+    
+    # Find the last complete sentence
+    # Look for sentence endings: . ! ? followed by space or end, or closing quote
+    sentence_endings = []
+    for match in re.finditer(r'[.!?]["\']?\s', text):
+        sentence_endings.append(match.end() - 1)
+    
+    # Also check for endings at the very end
+    for match in re.finditer(r'[.!?]["\']?$', text):
+        sentence_endings.append(match.end())
+    
+    if sentence_endings:
+        # Get the last complete sentence ending
+        last_end = max(sentence_endings)
+        text = text[:last_end].strip()
+    else:
+        # No sentence ending found - add a period if it looks like a sentence
+        if len(text) > 20 and text[-1] not in '.!?,"\'':
+            # Try to find a natural break point
+            last_comma = text.rfind(',')
+            last_and = text.rfind(' and ')
+            last_but = text.rfind(' but ')
+            
+            break_point = max(last_comma, last_and, last_but)
+            if break_point > len(text) * 0.5:  # Only use if in latter half
+                text = text[:break_point].rstrip(',').strip() + '.'
+            else:
+                text = text + '.'
+    
+    return text
 
 # Model configuration
 MODEL_PATH = r"D:\Story\Model\Qwen2.5-1.5B-Instruct"
@@ -18,6 +71,10 @@ device = None
 async def lifespan(app: FastAPI):
     # Startup
     global model, tokenizer, device
+    
+    # Initialize Firebase
+    initialize_firebase()
+    
     try:
         print(f"Loading model from {MODEL_PATH}...")
         
@@ -107,48 +164,80 @@ async def health_check():
         "device": "cuda" if torch.cuda.is_available() else "cpu"
     }
 
+@app.get("/user/me")
+async def get_user_info(current_user: dict = Depends(get_current_user)):
+    """Get current authenticated user information"""
+    return current_user
+
 @app.post("/generate", response_model=List[GeneratedOption])
-async def generate_continuation(request: GenerateRequest):
+async def generate_continuation(
+    request: GenerateRequest,
+    current_user: dict = Depends(get_current_user)  # Require authentication
+):
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
-        print(f"\n🎬 Generating {request.count} continuation(s) with {request.tone} tone, {request.length} length")
+        print(f"\n🎬 User {current_user['email']} generating {request.count} continuation(s) with {request.tone} tone, {request.length} length")
         
         # Adjust max_length based on length parameter (optimized for speed)
         length_map = {
-            "Short": 70,      # Reduced from 80 for 15% speed boost
-            "Medium": 120,    # Reduced from 150 for 20% speed boost
-            "Long": 180       # Reduced from 250 for 28% speed boost
+            "Short": 100,     # Fast, punchy continuations
+            "Medium": 200,    # Balanced speed and content
+            "Long": 800       # Fuller stories for initial generation
         }
-        max_new_tokens = length_map.get(request.length, 120)
+        # Use request.max_length if provided and greater than default, otherwise use length_map
+        default_tokens = length_map.get(request.length, 200)
+        max_new_tokens = max(default_tokens, request.max_length) if request.max_length > 0 else default_tokens
         
-        # Adjust temperature based on tone (lowered for faster, more focused generation)
+        # Cap at 2000 tokens to avoid memory issues
+        max_new_tokens = min(max_new_tokens, 2000)
+        
+        print(f"  Using max_new_tokens: {max_new_tokens}")
+        
+        # Adjust temperature based on tone (lower = faster, more focused)
         tone_temp_map = {
             "Dark": 0.65,
-            "Emotional": 0.75,
-            "Humorous": 0.8,
-            "Inspirational": 0.7,
-            "Mysterious": 0.75,
-            "Adaptive": 0.7
+            "Emotional": 0.70,
+            "Humorous": 0.75,
+            "Inspirational": 0.65,
+            "Mysterious": 0.70,
+            "Romantic": 0.70,
+            "Suspenseful": 0.65,
+            "Adaptive": 0.68
         }
-        temperature = tone_temp_map.get(request.tone, 0.7)
+        temperature = tone_temp_map.get(request.tone, 0.68)
         
         results = []
         
         for i in range(request.count):
             print(f"  Generating option {i+1}/{request.count}...")
             
-            # Create instruction for the model using Qwen's chat format
-            tone_instruction = f"Write in a {request.tone.lower()} tone."
-            length_instruction = f"Keep it concise and focused."
+            # Compact but effective system prompt for speed
+            tone_keywords = {
+                "Dark": "dark and atmospheric",
+                "Emotional": "emotionally resonant",
+                "Humorous": "witty and entertaining",
+                "Inspirational": "uplifting and hopeful",
+                "Mysterious": "intriguing and suspenseful",
+                "Romantic": "tender and passionate",
+                "Suspenseful": "tense and gripping",
+                "Adaptive": "naturally flowing"
+            }
+            tone_desc = tone_keywords.get(request.tone, "engaging")
             
-            system_message = f"You are a creative fiction writer. {tone_instruction} {length_instruction} Continue the story naturally and engagingly. Write only the continuation, nothing else."
+            system_message = f"""You are a creative fiction writer. Write {tone_desc} prose that is coherent and complete.
+
+Rules:
+- Continue the story naturally with vivid descriptions
+- Always end with a complete sentence (ending in . ! or ?)
+- Create meaningful story progression
+- Write only the story continuation, no commentary"""
             
             # Format using Qwen chat template
             messages = [
                 {"role": "system", "content": system_message},
-                {"role": "user", "content": f"Continue this story:\n\n{request.prompt}"}
+                {"role": "user", "content": f"Continue this story with a complete, coherent passage:\n\n{request.prompt[-2000:]}"}  # Limit context for speed
             ]
             
             # Apply chat template
@@ -161,24 +250,28 @@ async def generate_continuation(request: GenerateRequest):
             # Encode the prompt
             inputs = tokenizer(text, return_tensors="pt").to(device)
             
-            # Generate text with optimized parameters
+            # Generate text with speed-optimized parameters
             with torch.no_grad():
                 outputs = model.generate(
                     **inputs,
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
-                    top_p=0.85,          # Reduced from 0.9 for faster sampling
-                    top_k=40,            # Reduced from 50 for faster sampling
+                    top_p=0.85,          # Focused sampling for speed
+                    top_k=30,            # Reduced for faster token selection
                     do_sample=True,
                     num_return_sequences=1,
                     pad_token_id=tokenizer.pad_token_id,
                     eos_token_id=tokenizer.eos_token_id,
-                    repetition_penalty=1.1  # Reduced from 1.15 for faster generation
+                    repetition_penalty=1.12,
+                    use_cache=True,      # Enable KV cache for speed
                 )
             
             # Decode only the generated part
             generated_ids = outputs[0][inputs.input_ids.shape[1]:]
             continuation = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+            
+            # Clean up and ensure complete sentences
+            continuation = clean_and_complete_text(continuation)
             
             print(f"  ✓ Generated {len(continuation)} characters")
             

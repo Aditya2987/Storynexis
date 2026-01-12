@@ -4,3 +4,4 @@ transformers==4.47.1
 torch>=2.0.0
 python-multipart==0.0.18
 pydantic>=2.0.0
+firebase-admin>=7.0.0
