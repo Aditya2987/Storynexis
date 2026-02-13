@@ -214,7 +214,7 @@ const Login = () => {
                   disabled={loading}
                   autoComplete="email"
                 />
-                <label htmlFor="email">Email Address</label>
+                {/* <label htmlFor="email">Email Address</label> */}
               </div>
             </div>
 
@@ -238,7 +238,7 @@ const Login = () => {
                   disabled={loading}
                   autoComplete="current-password"
                 />
-                <label htmlFor="password">Password</label>
+                {/* <label htmlFor="password">Password</label> */}
                 <button
                   type="button"
                   className="password-toggle"

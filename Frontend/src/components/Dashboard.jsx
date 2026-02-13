@@ -1,6 +1,8 @@
 import { useAuth } from '../contexts/AuthContext';
+import { updateDisplayName } from '../firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
+import { getStories, deleteStory } from '../utils/api';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -8,10 +10,16 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedStory, setSelectedStory] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('recent');
+  const [editingName, setEditingName] = useState(false);
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [exportingStories, setExportingStories] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -40,16 +48,27 @@ const Dashboard = () => {
     }
   }, [user]);
 
-  const loadUserStories = () => {
+  const loadUserStories = async () => {
+    if (!user) return;
+
     try {
-      const storiesKey = `stories_${user.uid}`;
-      const savedStories = localStorage.getItem(storiesKey);
-      if (savedStories) {
-        const parsed = JSON.parse(savedStories);
-        setStories(parsed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
-      }
+      setLoading(true);
+      setError('');
+      const fetchedStories = await getStories();
+
+      // Convert metadata timestamps to timestamp for compatibility
+      const normalized = fetchedStories.map(story => ({
+        ...story,
+        timestamp: story.metadata?.updatedAt || story.metadata?.createdAt,
+        wordCount: story.metadata?.wordCount || 0
+      }));
+
+      setStories(normalized.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
     } catch (error) {
       console.error('Error loading stories:', error);
+      setError('Failed to load stories. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,13 +81,12 @@ const Dashboard = () => {
       genreCounts[genre] = (genreCounts[genre] || 0) + 1;
     });
     const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
-    
+
     return {
       totalStories: stories.length,
       totalWords,
       avgWords: stories.length ? Math.round(totalWords / stories.length) : 0,
       topGenre: topGenre ? topGenre[0] : 'None yet',
-      streak: 7,
       lastActive: stories[0]?.timestamp || null
     };
   }, [stories]);
@@ -76,15 +94,15 @@ const Dashboard = () => {
   // Filtered and sorted stories
   const filteredStories = useMemo(() => {
     let result = [...stories];
-    
+
     if (searchQuery) {
-      result = result.filter(s => 
+      result = result.filter(s =>
         s.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.genre?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
+
     switch (sortBy) {
       case 'oldest':
         result.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -98,7 +116,7 @@ const Dashboard = () => {
       default:
         result.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }
-    
+
     return result;
   }, [stories, searchQuery, sortBy]);
 
@@ -106,19 +124,20 @@ const Dashboard = () => {
     setSelectedStory(story);
   };
 
-  const handleDeleteStory = (storyId) => {
-    if (confirm('Are you sure you want to delete this story?')) {
-      try {
-        const storiesKey = `stories_${user.uid}`;
-        const updatedStories = stories.filter(s => s.id !== storyId);
-        localStorage.setItem(storiesKey, JSON.stringify(updatedStories));
-        setStories(updatedStories);
-        if (selectedStory?.id === storyId) {
-          setSelectedStory(null);
-        }
-      } catch (error) {
-        console.error('Error deleting story:', error);
+  const handleDeleteStory = async (storyId) => {
+    if (!confirm('Are you sure you want to delete this story?')) return;
+
+    try {
+      await deleteStory(storyId);
+      // Update local state
+      const updatedStories = stories.filter(s => s.id !== storyId);
+      setStories(updatedStories);
+      if (selectedStory?.id === storyId) {
+        setSelectedStory(null);
       }
+    } catch (error) {
+      console.error('Error deleting story:', error);
+      alert('Failed to delete story. Please try again.');
     }
   };
 
@@ -155,6 +174,66 @@ const Dashboard = () => {
     return Math.floor((now - created) / (1000 * 60 * 60 * 24));
   };
 
+  const handleSaveDisplayName = async () => {
+    if (!newDisplayName.trim()) return;
+    try {
+      setSavingName(true);
+      await updateDisplayName(newDisplayName.trim());
+      setEditingName(false);
+    } catch (err) {
+      console.error('Failed to update display name:', err);
+      alert('Failed to update name. Please try again.');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const handleExportAll = async () => {
+    if (stories.length === 0) return;
+    setExportingStories(true);
+    try {
+      const exportData = stories.map(s => ({
+        title: s.title || 'Untitled',
+        genre: s.genre || 'Any Genre',
+        content: s.content || '',
+        wordCount: s.wordCount || 0,
+        createdAt: s.timestamp,
+      }));
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `storynexis-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. Please try again.');
+    } finally {
+      setExportingStories(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (stories.length === 0) return;
+    const confirmed = confirm(`This will permanently delete all ${stories.length} stories. Are you sure?`);
+    if (!confirmed) return;
+    const doubleConfirm = confirm('This cannot be undone. Last chance — proceed?');
+    if (!doubleConfirm) return;
+
+    try {
+      for (const story of stories) {
+        await deleteStory(story.id);
+      }
+      setStories([]);
+      setSelectedStory(null);
+    } catch (err) {
+      console.error('Delete all failed:', err);
+      alert('Some stories could not be deleted. Please refresh and try again.');
+      loadUserStories();
+    }
+  };
+
   const getGenreColor = (genre) => {
     const colors = {
       'Fantasy': '#8b5cf6',
@@ -170,19 +249,9 @@ const Dashboard = () => {
     return colors[genre] || '#6b7280';
   };
 
-  const getGenreEmoji = (genre) => {
-    const emojis = {
-      'Fantasy': '🏰',
-      'Romance': '💕',
-      'Mystery': '🔍',
-      'Sci-Fi': '🚀',
-      'Horror': '👻',
-      'Thriller': '🔪',
-      'Adventure': '🗺️',
-      'Action': '💥',
-      'Any Genre': '📖',
-    };
-    return emojis[genre] || '📖';
+  const getGenreInitial = (genre) => {
+    if (!genre || genre === 'Any Genre') return 'A';
+    return genre.charAt(0).toUpperCase();
   };
 
   return (
@@ -195,20 +264,20 @@ const Dashboard = () => {
             <span>Storynexis</span>
           </div>
           <div className="nav-tabs">
-            <button 
+            <button
               className={`nav-tab ${activeTab === 'overview' ? 'active' : ''}`}
               onClick={() => setActiveTab('overview')}
             >
               Overview
             </button>
-            <button 
+            <button
               className={`nav-tab ${activeTab === 'stories' ? 'active' : ''}`}
               onClick={() => setActiveTab('stories')}
             >
               My Stories
               {stories.length > 0 && <span className="tab-badge">{stories.length}</span>}
             </button>
-            <button 
+            <button
               className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
               onClick={() => setActiveTab('settings')}
             >
@@ -245,15 +314,15 @@ const Dashboard = () => {
                 <p className="profile-email">{user?.email}</p>
                 <div className="profile-badges">
                   <span className={`status-badge ${user?.emailVerified ? 'verified' : 'unverified'}`}>
-                    {user?.emailVerified ? '✓ Verified' : '⚠ Unverified'}
+                    {user?.emailVerified ? '✓ Verified' : 'Unverified'}
                   </span>
                   <span className="member-badge">
-                    🎭 Writer for {getDaysSinceJoined()} days
+                    Writing for {getDaysSinceJoined()} days
                   </span>
                 </div>
               </div>
             </div>
-            
+
             <div className="profile-quick-stats">
               <div className="quick-stat">
                 <span className="quick-stat-value">{stats.totalStories}</span>
@@ -277,65 +346,49 @@ const Dashboard = () => {
             {/* Stats Dashboard */}
             <div className="stats-dashboard">
               <div className="stat-card-large primary">
-                <div className="stat-card-icon">✍️</div>
                 <div className="stat-card-content">
                   <span className="stat-card-value">{stats.totalStories}</span>
-                  <span className="stat-card-label">Total Stories</span>
-                </div>
-                <div className="stat-card-trend">
-                  <span className="trend-up">↑ Keep writing!</span>
+                  <span className="stat-card-label">Stories</span>
                 </div>
               </div>
-              
+
               <div className="stat-card-large">
-                <div className="stat-card-icon">📝</div>
                 <div className="stat-card-content">
                   <span className="stat-card-value">{stats.totalWords.toLocaleString()}</span>
-                  <span className="stat-card-label">Words Written</span>
+                  <span className="stat-card-label">Words written</span>
                 </div>
               </div>
-              
+
               <div className="stat-card-large">
-                <div className="stat-card-icon">📊</div>
                 <div className="stat-card-content">
                   <span className="stat-card-value">{stats.avgWords}</span>
-                  <span className="stat-card-label">Avg. Words/Story</span>
+                  <span className="stat-card-label">Avg per story</span>
                 </div>
               </div>
-              
+
               <div className="stat-card-large">
-                <div className="stat-card-icon">🔥</div>
                 <div className="stat-card-content">
-                  <span className="stat-card-value">{stats.streak}</span>
-                  <span className="stat-card-label">Day Streak</span>
+                  <span className="stat-card-value">{stats.topGenre}</span>
+                  <span className="stat-card-label">Top genre</span>
                 </div>
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="section-header">
-              <h2>Quick Actions</h2>
-            </div>
-            
             <div className="action-grid">
               <div className="action-card-new primary" onClick={handleStartWriting}>
-                <div className="action-card-shine"></div>
-                <div className="action-icon-circle">✨</div>
-                <h3>Create New Story</h3>
-                <p>Start a new creative journey with AI assistance</p>
+                <h3>New story</h3>
+                <p>Start a fresh draft with AI assistance</p>
                 <span className="action-arrow">→</span>
               </div>
 
               <div className="action-card-new" onClick={() => setActiveTab('stories')}>
-                <div className="action-icon-circle">📚</div>
-                <h3>My Library</h3>
-                <p>Access your {stories.length} saved {stories.length === 1 ? 'story' : 'stories'}</p>
+                <h3>My library</h3>
+                <p>{stories.length} {stories.length === 1 ? 'story' : 'stories'} saved</p>
                 <span className="action-arrow">→</span>
               </div>
 
               <div className="action-card-new" onClick={() => navigate('/edit')}>
-                <div className="action-icon-circle">🖊️</div>
-                <h3>Continue Writing</h3>
+                <h3>Continue writing</h3>
                 <p>Pick up where you left off</p>
                 <span className="action-arrow">→</span>
               </div>
@@ -350,12 +403,12 @@ const Dashboard = () => {
                     See All →
                   </button>
                 </div>
-                
+
                 <div className="recent-stories-grid">
                   {stories.slice(0, 3).map(story => (
                     <div key={story.id} className="recent-story-card" onClick={() => handleLoadStory(story)}>
                       <div className="story-cover" style={{ '--genre-color': getGenreColor(story.genre) }}>
-                        <span className="story-cover-icon">{getGenreEmoji(story.genre)}</span>
+                        <span className="story-cover-initial">{getGenreInitial(story.genre)}</span>
                       </div>
                       <div className="story-info">
                         <h4>{story.title || 'Untitled Story'}</h4>
@@ -372,29 +425,6 @@ const Dashboard = () => {
                 </div>
               </>
             )}
-
-            {/* Writing Tips */}
-            <div className="section-header">
-              <h2>Writing Tips</h2>
-            </div>
-            
-            <div className="tips-carousel">
-              <div className="tip-card">
-                <span className="tip-emoji">💡</span>
-                <h4>Use Specific Prompts</h4>
-                <p>The more detail you provide in your story idea, the better the AI can match your vision.</p>
-              </div>
-              <div className="tip-card">
-                <span className="tip-emoji">🎭</span>
-                <h4>Experiment with Tones</h4>
-                <p>Try different tones like "Mysterious" or "Humorous" to discover new narrative styles.</p>
-              </div>
-              <div className="tip-card">
-                <span className="tip-emoji">⌨️</span>
-                <h4>Keyboard Shortcuts</h4>
-                <p>Press Ctrl+G to generate, Ctrl+S to save, and Escape for focus mode.</p>
-              </div>
-            </div>
           </div>
         )}
 
@@ -402,8 +432,8 @@ const Dashboard = () => {
           <div className="tab-content">
             <div className="stories-toolbar">
               <div className="search-box">
-                <span className="search-icon">🔍</span>
-                <input 
+                <span className="search-icon">⌕</span>
+                <input
                   type="text"
                   placeholder="Search stories..."
                   value={searchQuery}
@@ -413,7 +443,7 @@ const Dashboard = () => {
                   <button className="clear-search" onClick={() => setSearchQuery('')}>✕</button>
                 )}
               </div>
-              
+
               <div className="sort-dropdown">
                 <label>Sort by:</label>
                 <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
@@ -423,7 +453,7 @@ const Dashboard = () => {
                   <option value="title">Title (A-Z)</option>
                 </select>
               </div>
-              
+
               <button className="btn-new-story" onClick={handleStartWriting}>
                 + New Story
               </button>
@@ -431,9 +461,8 @@ const Dashboard = () => {
 
             {filteredStories.length === 0 ? (
               <div className="empty-stories">
-                <div className="empty-icon">📝</div>
                 <h3>{searchQuery ? 'No stories found' : 'No stories yet'}</h3>
-                <p>{searchQuery ? 'Try a different search term' : 'Start your creative journey by writing your first story!'}</p>
+                <p>{searchQuery ? 'Try a different search term' : 'Start your creative journey by writing your first story.'}</p>
                 {!searchQuery && (
                   <button className="btn-create" onClick={handleStartWriting}>
                     Create Your First Story
@@ -444,27 +473,26 @@ const Dashboard = () => {
               <div className="stories-grid-new">
                 {filteredStories.map(story => (
                   <div key={story.id} className="story-card-new">
-                    <div className="story-card-cover" style={{ '--genre-color': getGenreColor(story.genre) }}>
-                      <span className="cover-emoji">{getGenreEmoji(story.genre)}</span>
-                      <div className="story-card-actions">
-                        <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); handleLoadStory(story); }} title="Edit">
-                          ✏️
+                    <div className="story-card-header" style={{ borderTopColor: getGenreColor(story.genre) }}>
+                      <span className="story-genre-tag" style={{ background: getGenreColor(story.genre) }}>
+                        {story.genre || 'Any Genre'}
+                      </span>
+                      <div className="story-card-actions-inline">
+                        <button className="card-action-btn-sm" onClick={(e) => { e.stopPropagation(); handleLoadStory(story); }} title="Edit">
+                          Edit
                         </button>
-                        <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); handleDeleteStory(story.id); }} title="Delete">
-                          🗑️
+                        <button className="card-action-btn-sm danger" onClick={(e) => { e.stopPropagation(); handleDeleteStory(story.id); }} title="Delete">
+                          Delete
                         </button>
                       </div>
                     </div>
                     <div className="story-card-body" onClick={() => handleViewStory(story)}>
-                      <span className="story-genre-tag" style={{ background: getGenreColor(story.genre) }}>
-                        {story.genre || 'Any Genre'}
-                      </span>
                       <h3 className="story-card-title">{story.title || 'Untitled Story'}</h3>
                       <p className="story-card-preview">
                         {story.content?.substring(0, 100)}...
                       </p>
                       <div className="story-card-footer">
-                        <span className="footer-meta">📝 {story.wordCount || 0} words</span>
+                        <span className="footer-meta">{story.wordCount || 0} words</span>
                         <span className="footer-date">{formatDate(story.timestamp)}</span>
                       </div>
                     </div>
@@ -479,16 +507,35 @@ const Dashboard = () => {
           <div className="tab-content">
             <div className="settings-grid">
               <div className="settings-card">
-                <h3>Account Information</h3>
+                <h3>Account</h3>
                 <div className="settings-field">
                   <label>Display Name</label>
                   <div className="field-value">
-                    <span>{user?.displayName || 'Not set'}</span>
-                    <button className="edit-btn">Edit</button>
+                    {editingName ? (
+                      <div className="inline-edit">
+                        <input
+                          className="edit-name-input"
+                          type="text"
+                          value={newDisplayName}
+                          onChange={(e) => setNewDisplayName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveDisplayName()}
+                          autoFocus
+                        />
+                        <button className="edit-btn" onClick={handleSaveDisplayName} disabled={savingName}>
+                          {savingName ? 'Saving...' : 'Save'}
+                        </button>
+                        <button className="edit-btn cancel" onClick={() => setEditingName(false)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <>
+                        <span>{user?.displayName || 'Not set'}</span>
+                        <button className="edit-btn" onClick={() => { setNewDisplayName(user?.displayName || ''); setEditingName(true); }}>Edit</button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="settings-field">
-                  <label>Email Address</label>
+                  <label>Email</label>
                   <div className="field-value">
                     <span>{user?.email}</span>
                     <button className="copy-email-btn" onClick={copyEmail}>
@@ -497,63 +544,34 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="settings-field">
-                  <label>Email Status</label>
+                  <label>Status</label>
                   <div className="field-value">
                     <span className={user?.emailVerified ? 'verified-text' : 'unverified-text'}>
-                      {user?.emailVerified ? '✓ Verified' : '⚠ Not Verified'}
+                      {user?.emailVerified ? '✓ Verified' : 'Not verified'}
                     </span>
                   </div>
                 </div>
                 <div className="settings-field">
-                  <label>Member Since</label>
+                  <label>Joined</label>
                   <div className="field-value">
                     <span>{formatDate(user?.metadata?.creationTime)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="settings-card">
-                <h3>Writing Preferences</h3>
-                <div className="settings-field">
-                  <label>Default Genre</label>
-                  <select className="settings-select">
-                    <option value="Any Genre">Any Genre</option>
-                    <option value="Fantasy">Fantasy</option>
-                    <option value="Romance">Romance</option>
-                    <option value="Mystery">Mystery</option>
-                    <option value="Sci-Fi">Sci-Fi</option>
-                    <option value="Horror">Horror</option>
-                  </select>
-                </div>
-                <div className="settings-field">
-                  <label>Default Tone</label>
-                  <select className="settings-select">
-                    <option value="Adaptive">Adaptive</option>
-                    <option value="Dark">Dark</option>
-                    <option value="Emotional">Emotional</option>
-                    <option value="Humorous">Humorous</option>
-                    <option value="Mysterious">Mysterious</option>
-                  </select>
-                </div>
-                <div className="settings-field">
-                  <label>Default Length</label>
-                  <select className="settings-select">
-                    <option value="Medium">Medium</option>
-                    <option value="Short">Short</option>
-                    <option value="Long">Long</option>
-                  </select>
-                </div>
-              </div>
-
               <div className="settings-card danger-zone">
-                <h3>Data Management</h3>
+                <h3>Data</h3>
                 <div className="settings-field">
-                  <label>Export Stories</label>
-                  <button className="btn-export">Download All Stories</button>
+                  <label>Export all stories as JSON</label>
+                  <button className="btn-export" onClick={handleExportAll} disabled={stories.length === 0 || exportingStories}>
+                    {exportingStories ? 'Exporting...' : `Download (${stories.length})`}
+                  </button>
                 </div>
                 <div className="settings-field">
-                  <label>Clear Data</label>
-                  <button className="btn-danger">Delete All Stories</button>
+                  <label>Permanently delete all stories</label>
+                  <button className="btn-danger" onClick={handleDeleteAll} disabled={stories.length === 0}>
+                    Delete all ({stories.length})
+                  </button>
                 </div>
               </div>
             </div>
@@ -572,21 +590,21 @@ const Dashboard = () => {
                 </span>
                 <h2>{selectedStory.title || 'Untitled Story'}</h2>
                 <div className="modal-meta">
-                  <span>📝 {selectedStory.wordCount || 0} words</span>
-                  <span>🎭 {selectedStory.tone || 'Adaptive'}</span>
-                  <span>📅 {formatDate(selectedStory.timestamp)}</span>
+                  <span>{selectedStory.wordCount || 0} words</span>
+                  <span>{selectedStory.tone || 'Adaptive'}</span>
+                  <span>{formatDate(selectedStory.timestamp)}</span>
                 </div>
               </div>
               <button className="modal-close-btn" onClick={() => setSelectedStory(null)}>✕</button>
             </div>
-            
+
             <div className="story-modal-content">
               {selectedStory.content}
             </div>
-            
+
             <div className="story-modal-footer">
               <button className="btn-modal-primary" onClick={() => handleLoadStory(selectedStory)}>
-                ✏️ Edit Story
+                Edit
               </button>
               <button className="btn-modal-secondary" onClick={() => {
                 const blob = new Blob([selectedStory.content], { type: 'text/plain' });
@@ -596,10 +614,10 @@ const Dashboard = () => {
                 a.download = `${selectedStory.title || 'story'}.txt`;
                 a.click();
               }}>
-                📥 Download
+                Download
               </button>
               <button className="btn-modal-danger" onClick={() => handleDeleteStory(selectedStory.id)}>
-                🗑️ Delete
+                Delete
               </button>
             </div>
           </div>

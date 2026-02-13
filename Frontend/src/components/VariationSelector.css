@@ -1,0 +1,330 @@
+.variation-selector-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.variation-selector {
+    background: var(--surface, #1e1e1e);
+    border-radius: 16px;
+    max-width: 1200px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.variation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: sticky;
+    top: 0;
+    background: var(--surface, #1e1e1e);
+    z-index: 10;
+}
+
+.variation-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--text-primary, #f3f4f6);
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #9ca3af);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary, #f3f4f6);
+}
+
+.variations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
+}
+
+.variation-card {
+    background: var(--background, #111827);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.variation-card:hover {
+    border-color: rgba(99, 102, 241, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+}
+
+.variation-card.selected {
+    border-color: var(--primary, #6366f1);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+}
+
+.variation-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.variation-number {
+    font-weight: 600;
+    color: var(--text-secondary, #9ca3af);
+    font-size: 0.875rem;
+}
+
+.quality-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.quality-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.quality-badge.high {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.quality-badge.medium {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.quality-badge.low {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.quality-score {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #9ca3af);
+}
+
+.variation-text {
+    font-family: 'Georgia', serif;
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--text-primary, #f3f4f6);
+    margin-bottom: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.variation-text::-webkit-scrollbar {
+    width: 6px;
+}
+
+.variation-text::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.variation-text::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.variation-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.word-count {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #9ca3af);
+}
+
+.quality-metrics {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #9ca3af);
+}
+
+.selected-indicator {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--primary, #6366f1);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    animation: bounceIn 0.3s ease;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.variation-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    position: sticky;
+    bottom: 0;
+    background: var(--surface, #1e1e1e);
+}
+
+.regenerate-btn {
+    padding: 0.75rem 1.5rem;
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary, #6366f1);
+    border: 1px solid var(--primary, #6366f1);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.regenerate-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    transform: scale(1.05);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.cancel-action-btn {
+    padding: 0.75rem 1.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary, #9ca3af);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.cancel-action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary, #f3f4f6);
+}
+
+.accept-btn {
+    padding: 0.75rem 1.5rem;
+    background: var(--primary, #6366f1);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.accept-btn:hover:not(:disabled) {
+    background: var(--primary-dark, #4f46e5);
+    transform: scale(1.05);
+}
+
+.accept-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .variations-grid {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+    }
+
+    .variation-selector {
+        width: 95%;
+        max-height: 95vh;
+    }
+
+    .variation-actions {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .action-buttons {
+        width: 100%;
+    }
+
+    .regenerate-btn,
+    .cancel-action-btn,
+    .accept-btn {
+        flex: 1;
+    }
+}

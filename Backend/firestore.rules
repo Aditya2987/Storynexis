@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Stories collection
+    match /stories/{storyId} {
+      // Allow authenticated users to read their own stories
+      allow read: if request.auth != null && 
+                     (resource.data.userId == request.auth.uid || 
+                      resource.data.userId == "guest");
+      
+      // Allow authenticated users to create stories with their userId
+      allow create: if request.auth != null && 
+                       (request.resource.data.userId == request.auth.uid ||
+                        request.resource.data.userId == "guest");
+      
+      // Allow authenticated users to update/delete their own stories
+      allow update, delete: if request.auth != null && 
+                               (resource.data.userId == request.auth.uid ||
+                                resource.data.userId == "guest");
+    }
+    
+    // For DEV_MODE - allow guest user access
+    // This allows the backend to save stories when DEV_MODE=true
+    match /stories/{storyId} {
+      allow read, write: if request.resource.data.userId == "guest" || 
+                            resource.data.userId == "guest";
+    }
+  }
+}

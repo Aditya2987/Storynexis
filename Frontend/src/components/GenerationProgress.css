@@ -1,0 +1,173 @@
+.generation-progress {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  max-width: 500px;
+  min-width: 350px;
+  background: var(--surface, #1e1e1e);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+  z-index: 1000;
+  animation: slideUp 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.progress-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary, #6366f1);
+}
+
+.progress-percent {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.cancel-btn {
+  padding: 0.5rem 1rem;
+  background: var(--error, #ef4444);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.cancel-btn:hover {
+  background: var(--error-dark, #dc2626);
+  transform: scale(1.05);
+}
+
+.generated-preview {
+  margin-top: 1rem;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.preview-header h4 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #f3f4f6);
+}
+
+.preview-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.accept-btn, .reject-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.accept-btn {
+  background: var(--success, #10b981);
+  color: white;
+}
+
+.accept-btn:hover {
+  background: var(--success-dark, #059669);
+  transform: scale(1.05);
+}
+
+.reject-btn {
+  background: var(--error, #ef4444);
+  color: white;
+}
+
+.reject-btn:hover {
+  background: var(--error-dark, #dc2626);
+  transform: scale(1.05);
+}
+
+.preview-content {
+  padding: 1rem;
+  background: var(--background, #111827);
+  border-radius: 8px;
+  font-family: 'Georgia', serif;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+  color: var(--text-primary, #f3f4f6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.preview-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.preview-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.preview-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.preview-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.typing-cursor {
+  animation: blink 1s infinite;
+  color: var(--primary, #6366f1);
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .generation-progress {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+    max-width: none;
+    min-width: auto;
+  }
+}

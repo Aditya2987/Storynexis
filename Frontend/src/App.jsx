@@ -6,128 +6,39 @@ import Signup from './components/Signup';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './components/Dashboard';
 import Editor from './components/Editor';
-import { generateContinuation } from './utils/api';
-import './App.css'; 
-
-const tonePalette = {
-  Dark: '#4b2d5c',
-  Emotional: '#c95a7d',
-  Humorous: '#f4a259',
-  Inspirational: '#2fbf71',
-  Mysterious: '#5c7aea',
-  Adaptive: '#4c5fd5',
-  Opening: '#4c5fd5',
-  Default: '#4c5fd5',
-};
-
-const genrePalette = {
-  'Any Genre': '#94a3b8',
-  Action: '#f97316',
-  Fantasy: '#8b5cf6',
-  Romance: '#ff7dac',
-  Horror: '#ff6b6b',
-  'Science Fiction': '#22d3ee',
-  Mystery: '#c084fc',
-  Adventure: '#f0abfc',
-  'Sci-Fi': '#22d3ee',
-  'Short Story': '#ec4899',
-  'Young Adult': '#f472b6',
-  Crime: '#fb7185',
-  "Children's Books": '#34d399',
-  Thriller: '#facc15',
-  Humor: '#fde047',
-  'Historical Fiction': '#fbbf24',
-  Adult: '#a78bfa',
-  Default: '#f472b6',
-};
+import { generateContinuation, generateContinuationStream } from './utils/api';
+import './App.css';
+import StoryGenerationLoader from './components/StoryGenerationLoader';
+import {
+  tonePalette,
+  genrePalette,
+  navLinks,
+  heroGenres,
+  featureHighlights
+} from './constants/landingPageData';
 
 const getToneColor = (tone) => tonePalette[tone] || tonePalette.Default;
 
-const navLinks = [
-  { label: 'Overview', target: 'site-hero' },
-  { label: 'Features', target: 'feature-grid' },
-  { label: 'Stories', target: 'story-showcase' },
-  { label: 'FAQ', target: 'faq-hub' },
-];
-
-const heroGenres = ['Any Genre', 'Romance', 'Action', 'Mystery', 'Fantasy', 'Short Story', 'Sci-Fi', 'Young Adult', 'Crime', 'Horror', "Children's Books", 'Thriller', 'Humor', 'Historical Fiction', 'Adult'];
-
-const heroLogos = ['WIRED', 'Fast Company', 'Business Insider', 'goodreads', 'TNW'];
-
-const heroStats = [
-  { label: 'Stories Crafted', value: '12K+', icon: '📚' },
-  { label: 'Avg. Session', value: '18 min', icon: '⏱️' },
-  { label: 'Writers Online', value: '1,204', icon: '✍️' },
-  { label: 'Words Generated', value: '2.4M', icon: '📝' },
-];
-
-const featureHighlights = [
-  {
-    title: 'Branching Narratives',
-    description: 'Create multiple story paths simultaneously. Let AI generate 3 unique continuations and choose your favorite direction.',
-    icon: '🌳',
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  },
-  {
-    title: 'Adaptive Intelligence',
-    description: 'Our AI learns your writing style. It adapts to your tone, pacing, and genre preferences as you write.',
-    icon: '🧠',
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-  },
-  {
-    title: 'Real-time Analytics',
-    description: 'Track word counts, reading time, and pacing insights. Get suggestions to improve narrative flow.',
-    icon: '📊',
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-  },
-  {
-    title: 'Genre Mastery',
-    description: 'From fantasy epics to thriller mysteries. Our AI understands 15+ genres and their unique conventions.',
-    icon: '📖',
-    gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-  },
-  {
-    title: 'Focus Mode',
-    description: 'Distraction-free writing with keyboard shortcuts. Press Ctrl+G to generate, Ctrl+S to save instantly.',
-    icon: '🎯',
-    gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-  },
-  {
-    title: 'Story Library',
-    description: 'All your stories saved securely. Access history, continue drafts, and manage your creative portfolio.',
-    icon: '🗂️',
-    gradient: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-  },
-];
-
 const howItWorksSteps = [
   {
-    title: 'Dream',
-    description: 'Start with a spark—a title, a concept, or just a feeling you want to capture.',
-    detail: 'Choose your genre and let your imagination set the stage.',
-    icon: '💭',
-    number: '01',
+    title: 'Imagine',
+    description: 'A title, a premise, or just a mood. That’s enough to begin.',
+    number: '1',
   },
   {
     title: 'Generate',
-    description: 'Watch as AI crafts atmospheric openings tailored to your vision.',
-    detail: 'Get multiple options and pick the path that resonates.',
-    icon: '⚡',
-    number: '02',
+    description: 'The AI drafts an opening that fits your genre and intent.',
+    number: '2',
   },
   {
-    title: 'Refine',
-    description: 'Shape your narrative with precision using tone, length, and style controls.',
-    detail: 'Every continuation maintains your unique voice.',
-    icon: '✨',
-    number: '03',
+    title: 'Shape',
+    description: 'Edit freely. Ask for continuations. Steer the direction.',
+    number: '3',
   },
   {
-    title: 'Publish',
-    description: 'Export your finished story or continue building your masterpiece.',
-    detail: 'Your stories are saved and always accessible.',
-    icon: '🚀',
-    number: '04',
+    title: 'Keep',
+    description: 'Your work saves automatically. Come back to any draft.',
+    number: '4',
   },
 ];
 
@@ -135,23 +46,20 @@ const testimonials = [
   {
     name: 'Sarah Chen',
     role: 'Fantasy Author',
-    text: 'Storynexis transformed my writing process. I finished my 80k word novel in 3 months instead of a year.',
-    avatar: '👩‍💻',
-    rating: 5,
+    text: 'I finished my 80k-word novel in three months instead of a year. The branching continuations alone saved me weeks of plotting.',
+    initials: 'SC',
   },
   {
     name: 'Marcus Johnson',
     role: 'Game Writer',
-    text: 'The branching narrative feature is perfect for creating quest dialogues. Game-changer for interactive storytelling.',
-    avatar: '👨‍🎮',
-    rating: 5,
+    text: 'Perfect for prototyping quest dialogues. I draft branching scenes in Storynexis and export them straight into our design doc.',
+    initials: 'MJ',
   },
   {
     name: 'Elena Rodriguez',
     role: 'Screenwriter',
-    text: 'I use it to prototype scenes before full scripts. The tone adaptation keeps my characters consistent.',
-    avatar: '👩‍🎬',
-    rating: 5,
+    text: 'I sketch alternate scenes here before committing to a full script. The tone matching keeps my characters consistent across drafts.',
+    initials: 'ER',
   },
 ];
 
@@ -329,14 +237,22 @@ function AppContent() {
   const [copyStatus, setCopyStatus] = useState('');
   const [activeFaq, setActiveFaq] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
+
+  // Ref to track cancellation
+  const abortControllerRef = useRef(null);
+  const generationAbortRef = useRef(false); // Keep this for logic checks, or rely on controller
+
   const API_URL = 'http://localhost:8000';
 
   // Helper function to make authenticated API calls for backward compatibility
-  const makeAuthenticatedCall = async (params) => {
+  const makeAuthenticatedCall = async (params, signal) => {
     try {
-      return await generateContinuation(params);
+      return await generateContinuation(params, null, signal);
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request aborted via makeAuthenticatedCall');
+        throw error;
+      }
       console.error('API call failed:', error);
       throw error;
     }
@@ -366,6 +282,16 @@ function AppContent() {
     setActiveFaq((prev) => (prev === index ? null : index));
   };
 
+  const handleCancelGeneration = () => {
+    generationAbortRef.current = true;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+    console.log('Generation cancelled by user');
+  };
+
   const handleStartStory = async () => {
     const trimmedTitle = storyTitle.trim();
     const trimmedOpening = openingLine.trim();
@@ -376,6 +302,15 @@ function AppContent() {
     }
 
     setError(null);
+    generationAbortRef.current = false; // Reset abort flag
+
+    // Create new AbortController
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort(); // ensure prev is cleared
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setLoading(true);
 
     try {
@@ -392,7 +327,7 @@ function AppContent() {
       if (trimmedTitle && trimmedOpening) {
         console.log('Generating opening from title and idea...');
         finalTitle = trimmedTitle;
-        
+
         // Generate opening paragraph from the idea
         try {
           const openingPrompt = `Write a compelling story opening for a ${genre || 'fiction'} story titled "${trimmedTitle}" based on this idea: "${trimmedOpening}".
@@ -405,23 +340,26 @@ Requirements:
 - Use vivid details and strong prose
 - End with a complete sentence
 - Write ONLY the story, no meta-commentary`;
-          
-          const openingOptions = await makeAuthenticatedCall({ 
-            prompt: openingPrompt, 
-            tone: 'Adaptive', 
-            length: 'Long', 
+
+          const openingOptions = await makeAuthenticatedCall({
+            prompt: openingPrompt,
+            tone: 'Adaptive',
+            length: 'Long',
             count: 1,
             max_length: 800
           });
+
+          if (generationAbortRef.current) return; // Check if cancelled
+
           console.log('API Response (title+idea):', openingOptions);
-          
+
           if (!openingOptions || !Array.isArray(openingOptions) || openingOptions.length === 0) {
             console.error('Invalid response format:', openingOptions);
             throw new Error('Invalid response from server');
           }
-          
+
           let generatedText = openingOptions[0].text.trim();
-          
+
           // Ensure text ends with proper punctuation
           const lastChar = generatedText[generatedText.length - 1];
           if (!['.', '!', '?', '"', "'"].includes(lastChar)) {
@@ -430,7 +368,7 @@ Requirements:
             const lastExclamation = generatedText.lastIndexOf('!');
             const lastQuestion = generatedText.lastIndexOf('?');
             const lastPunctuation = Math.max(lastPeriod, lastExclamation, lastQuestion);
-            
+
             if (lastPunctuation > 0) {
               generatedText = generatedText.substring(0, lastPunctuation + 1).trim();
               console.log('Trimmed incomplete sentence');
@@ -438,10 +376,11 @@ Requirements:
               generatedText += '.';
             }
           }
-          
+
           finalOpening = generatedText;
           console.log('Generated opening from title+idea:', finalOpening.substring(0, 100) + '...');
         } catch (openingError) {
+          if (generationAbortRef.current) return;
           console.error('Error generating opening:', openingError);
           console.error('Error details:', openingError.message, openingError.status);
           if (openingError.status === 401) {
@@ -458,25 +397,28 @@ Requirements:
       // If only idea provided, generate both title and story opening
       else if (!trimmedTitle && trimmedOpening) {
         console.log('Generating title and opening from idea...');
-        
+
         // Generate title first
         try {
           const titlePrompt = `Based on this story idea: "${trimmedOpening.substring(0, 200)}", create a compelling story title (5-8 words maximum). Reply with ONLY the title, no quotes or extra text.`;
-          
-          const titleOptions = await makeAuthenticatedCall({ 
-            prompt: titlePrompt, 
-            tone: 'Adaptive', 
-            length: 'Short', 
+
+          const titleOptions = await makeAuthenticatedCall({
+            prompt: titlePrompt,
+            tone: 'Adaptive',
+            length: 'Short',
             count: 1,
             max_length: 40
-          });
+          }, signal);
+
+          if (generationAbortRef.current) return;
+
           console.log('API Response (title):', titleOptions);
-          
+
           if (!titleOptions || !Array.isArray(titleOptions) || titleOptions.length === 0) {
             console.error('Invalid title response:', titleOptions);
             throw new Error('Invalid title response from server');
           }
-          
+
           finalTitle = titleOptions[0].text.trim().replace(/^["']|["']$/g, '').split('\n')[0].split('.')[0];
           console.log('Generated title:', finalTitle);
         } catch (titleError) {
@@ -495,23 +437,26 @@ Requirements:
 - Use vivid details and strong prose
 - End with a complete sentence
 - Write ONLY the story, no meta-commentary`;
-          
-          const openingOptions = await makeAuthenticatedCall({ 
-            prompt: openingPrompt, 
-            tone: 'Adaptive', 
-            length: 'Long', 
+
+          const openingOptions = await makeAuthenticatedCall({
+            prompt: openingPrompt,
+            tone: 'Adaptive',
+            length: 'Long',
             count: 1,
             max_length: 800
           });
+
+          if (generationAbortRef.current) return;
+
           console.log('API Response (idea only):', openingOptions);
-          
+
           if (!openingOptions || !Array.isArray(openingOptions) || openingOptions.length === 0) {
             console.error('Invalid opening response:', openingOptions);
             throw new Error('Invalid opening response from server');
           }
-          
+
           let generatedText = openingOptions[0].text.trim();
-          
+
           // Ensure text ends with proper punctuation
           const lastChar = generatedText[generatedText.length - 1];
           if (!['.', '!', '?', '"', "'"].includes(lastChar)) {
@@ -520,7 +465,7 @@ Requirements:
             const lastExclamation = generatedText.lastIndexOf('!');
             const lastQuestion = generatedText.lastIndexOf('?');
             const lastPunctuation = Math.max(lastPeriod, lastExclamation, lastQuestion);
-            
+
             if (lastPunctuation > 0) {
               generatedText = generatedText.substring(0, lastPunctuation + 1).trim();
               console.log('Trimmed incomplete sentence');
@@ -528,10 +473,11 @@ Requirements:
               generatedText += '.';
             }
           }
-          
+
           finalOpening = generatedText;
           console.log('Generated opening:', finalOpening.substring(0, 100) + '...');
         } catch (openingError) {
+          if (generationAbortRef.current) return;
           console.error('Error generating opening:', openingError);
           // Don't use the raw idea as opening - this causes confusion
           setError('Failed to generate story opening. Please try again.');
@@ -549,7 +495,7 @@ Requirements:
       // If only title provided, generate opening
       else if (trimmedTitle && !trimmedOpening) {
         console.log('Generating opening from title...');
-        
+
         const openingPrompt = `Write a compelling story opening for a ${genre || 'fiction'} story titled "${trimmedTitle}".
 
 Requirements:
@@ -560,18 +506,20 @@ Requirements:
 - Use vivid details and strong prose
 - End with a complete sentence
 - Write ONLY the story, no meta-commentary`;
-        
+
         try {
-          const openingOptions = await makeAuthenticatedCall({ 
-            prompt: openingPrompt, 
-            tone: 'Adaptive', 
-            length: 'Long', 
+          const openingOptions = await makeAuthenticatedCall({
+            prompt: openingPrompt,
+            tone: 'Adaptive',
+            length: 'Long',
             count: 1,
             max_length: 800
           });
 
+          if (generationAbortRef.current) return;
+
           let generatedText = (openingOptions[0].text || '').trim();
-          
+
           // Ensure text ends with proper punctuation
           const lastChar = generatedText[generatedText.length - 1];
           if (!['.', '!', '?', '"', "'"].includes(lastChar)) {
@@ -580,7 +528,7 @@ Requirements:
             const lastExclamation = generatedText.lastIndexOf('!');
             const lastQuestion = generatedText.lastIndexOf('?');
             const lastPunctuation = Math.max(lastPeriod, lastExclamation, lastQuestion);
-            
+
             if (lastPunctuation > 0) {
               generatedText = generatedText.substring(0, lastPunctuation + 1).trim();
               console.log('Trimmed incomplete sentence');
@@ -588,17 +536,20 @@ Requirements:
               generatedText += '.';
             }
           }
-          
+
           finalOpening = generatedText;
           console.log('Generated opening:', finalOpening.substring(0, 100) + '...');
         } catch (openingError) {
+          if (generationAbortRef.current) return;
           console.error('Error generating opening:', openingError);
           setError('Failed to generate story opening. Please try again.');
           setLoading(false);
           return; // Stop here - don't proceed
         }
       }
-      
+
+      if (generationAbortRef.current) return;
+
       // Final verification - must have both title and opening
       if (!finalTitle || !finalOpening || finalOpening.trim() === '') {
         console.error('Verification failed - Title:', finalTitle, 'Opening:', finalOpening);
@@ -619,7 +570,7 @@ Requirements:
       setStoryBeats([openingBeat]);
       setStoryTitle(finalTitle);
       setOpeningLine(finalOpening);
-      
+
       // Prepare story data for Editor
       const storyData = {
         id: Date.now().toString(),
@@ -629,20 +580,23 @@ Requirements:
         chapters: [],
         createdAt: new Date().toISOString(),
       };
-      
+
       // Save to sessionStorage as backup
       sessionStorage.setItem('currentStory', JSON.stringify(storyData));
-      
+
       // Navigate to editor with story data
       navigate('/edit', { state: { loadedStory: storyData } });
       setError(null);
     } catch (err) {
+      if (generationAbortRef.current) return;
       console.error('Generation error:', err);
       setError('Failed to start story. Please make sure the backend is running and try again.');
       setLoading(false);
       return; // Don't proceed to edit page on error
     } finally {
-      setLoading(false);
+      if (!generationAbortRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -652,31 +606,63 @@ Requirements:
       return;
     }
     setError(null);
-    setLoading(true);
-    
+    setLoading(true); // Start loading spinner (Connection phase)
+
     try {
       const contextPrompt = fullStoryText || `A ${genre} story titled "${storyTitle}"`;
       const fullPrompt = `${contextPrompt}\n\n`;
 
-      const options = await generateContinuation({
-        prompt: fullPrompt,
-        tone: 'Adaptive',  // Always use Adaptive tone
-        length: length,
-        count: 1  // Always generate 1 option
-      });
+      const streamId = Date.now();
+      let currentText = '';
 
-      setGeneratedOptions(options);
-      setShowModal(true);
+      // Call streaming API
+      await generateContinuationStream(
+        {
+          prompt: fullPrompt,
+          tone: 'Adaptive',
+          length: length,
+          // Calculate max tokens based on length selection to match backend logic
+          max_length: length === 'Short' ? 150 : length === 'Medium' ? 300 : 600
+        },
+        (chunk) => {
+          // onChunk: user receives text token by token
+          currentText += chunk;
+
+          // Update options in real-time
+          setGeneratedOptions([{
+            id: streamId,
+            text: currentText,
+            tone: 'Adaptive',
+            length: length,
+            isStreaming: true
+          }]);
+
+          // Once we have data, stop the "loading" spinner and show the modal
+          setLoading(false);
+          setShowModal(true);
+        },
+        (fullText) => {
+          // onComplete
+          setGeneratedOptions([{
+            id: streamId,
+            text: fullText,
+            tone: 'Adaptive',
+            length: length,
+            isStreaming: false
+          }]);
+          setLoading(false);
+        },
+        (err) => {
+          // onError
+          console.error(err);
+          setError(err.message || 'Failed to generate stream.');
+          setLoading(false);
+        }
+      );
+
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to generate continuation. Please try again.');
-      // Demo fallback
-      setGeneratedOptions([
-        { id: 1, text: "Suddenly, a mysterious figure appeared from the shadows, holding a glowing artifact.", tone: 'Adaptive', length: length },
-        { id: 2, text: "The wind howled, whispering secrets of the ancient past that had been long forgotten.", tone: 'Adaptive', length: length }
-      ]);
-      setShowModal(true);
-    } finally {
+      setError(err.message || 'Failed to start generation.');
       setLoading(false);
     }
   };
@@ -734,7 +720,7 @@ Requirements:
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/" element={
-        <LandingPage 
+        <LandingPage
           genre={genre}
           setGenre={setGenre}
           storyTitle={storyTitle}
@@ -744,6 +730,7 @@ Requirements:
           error={error}
           loading={loading}
           handleStartStory={handleStartStory}
+          handleCancelGeneration={handleCancelGeneration}
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
           scrollToSection={scrollToSection}
@@ -761,603 +748,510 @@ Requirements:
   );
 }
 
-function LandingPage({ 
+function LandingPage({
   genre, setGenre, storyTitle, setStoryTitle, openingLine, setOpeningLine,
-  error, loading, handleStartStory, mobileMenuOpen, setMobileMenuOpen,
+  error, loading, handleStartStory, handleCancelGeneration, mobileMenuOpen, setMobileMenuOpen,
   scrollToSection, activeFaq, handleFaqToggle
 }) {
-    const navigate = useNavigate();
-    const { user, logout } = useAuth();
-    const [activeTestimonial, setActiveTestimonial] = useState(0);
-    const [hoveredFeature, setHoveredFeature] = useState(null);
-    const heroTitle = useTypewriter("Transform Ideas Into Epic Stories", 40, 300);
-    const statsCounter1 = useCounter(12, 2000, 0);
-    const statsCounter2 = useCounter(18, 2000, 0);
-    const statsCounter3 = useCounter(1204, 2500, 0);
-    const statsCounter4 = useCounter(2400, 2000, 0);
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [hoveredFeature, setHoveredFeature] = useState(null);
+  const heroTitle = useTypewriter("Write stories you actually want to read", 40, 300);
 
-    // Auto-rotate testimonials
-    useEffect(() => {
-      const interval = setInterval(() => {
-        setActiveTestimonial((prev) => (prev + 1) % testimonials.length);
-      }, 5000);
-      return () => clearInterval(interval);
-    }, []);
+  // Auto-rotate testimonials
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveTestimonial((prev) => (prev + 1) % testimonials.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const handleLogout = async () => {
-      try {
-        await logout();
-        navigate('/');
-      } catch (error) {
-        console.error('Logout failed:', error);
-      }
-    };
+  // Clear inputs on mount (fresh start)
+  useEffect(() => {
+    setGenre('Any Genre');
+    setStoryTitle('');
+    setOpeningLine('');
+  }, [setGenre, setStoryTitle, setOpeningLine]);
 
-    return (
-      <div className="app-wrapper">
-        {/* Animated background particles */}
-        <div className="hero-particles">
-          <div className="particle"></div>
-          <div className="particle"></div>
-          <div className="particle"></div>
-          <div className="particle"></div>
-          <div className="particle"></div>
-          <div className="particle"></div>
-        </div>
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
-        <nav className="title-bar">
-          <div className="title-bar-content">
-            <div className="brand" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-              <span className="brand-icon">📖</span>
-              <span>Storynexis</span>
-            </div>
-            <button className="hamburger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
-              <span></span>
-              <span></span>
-              <span></span>
-            </button>
-            <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-              {navLinks.map((link) => (
-                <button key={link.label} className="nav-link" onClick={() => { scrollToSection(link.target); setMobileMenuOpen(false); }}>
-                  {link.label}
-                </button>
-              ))}
-            </div>
-            <div className="nav-actions">
-              {user ? (
-                <>
-                  <button className="nav-link nav-ghost" onClick={() => navigate('/profile')}>
-                    👤 Profile
-                  </button>
-                  <button className="btn-nav" onClick={handleLogout}>
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button className="nav-link nav-ghost" onClick={() => navigate('/login')}>Log In</button>
-                  <button className="btn-nav" onClick={() => navigate('/signup')}>Sign Up Free</button>
-                </>
-              )}
-            </div>
-          </div>
-        </nav>
-
-        <div className="app-container">
-          <div className="view-transition">
-            <div className="initial-screen">
-              {/* Enhanced Hero Section - Compact Layout */}
-              <section id="site-hero" className="hero-section hero-compact">
-                <div className="hero-split">
-                  {/* Left: Text Content */}
-                  <div className="hero-text-side">
-                    <div className="hero-badge">
-                      <span className="badge-icon">✨</span>
-                      <span>AI-Powered Creative Writing</span>
-                    </div>
-                    <h1 className="hero-title-animated">
-                      {heroTitle.displayText}
-                      <span className={`cursor ${heroTitle.isComplete ? 'blink' : ''}`}>|</span>
-                    </h1>
-                    <p className="hero-subtitle-compact">
-                      Unleash your creativity with intelligent story generation. Craft compelling narratives in any genre.
-                    </p>
-                    
-                    {/* Quick Stats */}
-                    <div className="hero-mini-stats">
-                      <div className="mini-stat">
-                        <span className="mini-stat-value">12K+</span>
-                        <span className="mini-stat-label">Stories</span>
-                      </div>
-                      <div className="mini-stat">
-                        <span className="mini-stat-value">1.2K</span>
-                        <span className="mini-stat-label">Writers</span>
-                      </div>
-                      <div className="mini-stat">
-                        <span className="mini-stat-value">2.4M</span>
-                        <span className="mini-stat-label">Words</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right: Prompt Panel */}
-                  <div className="hero-form-side">
-                    <div className="prompt-panel-compact">
-                      <div className="prompt-panel-header">
-                        <span className="prompt-icon">✍️</span>
-                        <h3>Start Your Story</h3>
-                      </div>
-                      
-                      <div className="prompt-form">
-                        <div className="form-group">
-                          <label>Story Title</label>
-                          <input
-                            className="form-input"
-                            placeholder="e.g. The Last Starship"
-                            value={storyTitle}
-                            onChange={(e) => setStoryTitle(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label>Story Idea</label>
-                          <textarea
-                            className="form-textarea"
-                            rows="3"
-                            placeholder="Describe your story concept..."
-                            value={openingLine}
-                            onChange={(e) => setOpeningLine(e.target.value)}
-                          />
-                        </div>
-
-                        {/* Inline Genre Selection */}
-                        <div className="form-group">
-                          <label>Genre</label>
-                          <div className="genre-inline-row">
-                            {['Any Genre', 'Fantasy', 'Romance', 'Mystery', 'Sci-Fi', 'Horror', 'Thriller'].map((chip) => (
-                              <button
-                                key={chip}
-                                className={`genre-chip-inline ${genre === chip ? 'active' : ''}`}
-                                onClick={() => setGenre(chip)}
-                                style={{ '--chip-color': genrePalette[chip] || '#94a3b8' }}
-                              >
-                                {chip}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {error && <div className="error-message-enhanced">{error}</div>}
-
-                        <button className="btn-primary-enhanced" onClick={handleStartStory} disabled={loading}>
-                          {loading ? (
-                            <>
-                              <span className="loading-spinner"></span>
-                              <span>Creating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>Generate Story</span>
-                              <span className="btn-arrow">→</span>
-                            </>
-                          )}
-                        </button>
-                        <p className="prompt-hint">Free to start • No credit card required</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* More Genres - Collapsible */}
-                <details className="more-genres-section">
-                  <summary className="more-genres-toggle">
-                    <span>More Genres</span>
-                    <span className="toggle-arrow">▼</span>
-                  </summary>
-                  <div className="genre-chip-row-expanded">
-                    {heroGenres.filter(g => !['Any Genre', 'Fantasy', 'Romance', 'Mystery', 'Sci-Fi', 'Horror', 'Thriller'].includes(g)).map((chip) => (
-                      <button
-                        key={chip}
-                        className={`genre-chip-enhanced ${genre === chip ? 'active' : ''}`}
-                        onClick={() => setGenre(chip)}
-                        style={{ '--chip-color': genrePalette[chip] || '#94a3b8' }}
-                      >
-                        {chip}
-                      </button>
-                    ))}
-                  </div>
-                </details>
-              </section>
-
-              {/* Stats Section - Below fold */}
-              <section className="stats-section">
-                <div className="stats-grid">
-                  <div className="stat-card" ref={statsCounter1.ref}>
-                    <span className="stat-icon">📚</span>
-                    <div className="stat-content">
-                      <span className="stat-value">{statsCounter1.count}K+</span>
-                      <span className="stat-label">Stories Crafted</span>
-                    </div>
-                  </div>
-                  <div className="stat-card" ref={statsCounter2.ref}>
-                    <span className="stat-icon">⏱️</span>
-                    <div className="stat-content">
-                      <span className="stat-value">{statsCounter2.count} min</span>
-                      <span className="stat-label">Avg. Session</span>
-                    </div>
-                  </div>
-                  <div className="stat-card" ref={statsCounter3.ref}>
-                    <span className="stat-icon">✍️</span>
-                    <div className="stat-content">
-                      <span className="stat-value">{statsCounter3.count.toLocaleString()}</span>
-                      <span className="stat-label">Writers Online</span>
-                    </div>
-                  </div>
-                  <div className="stat-card" ref={statsCounter4.ref}>
-                    <span className="stat-icon">📝</span>
-                    <div className="stat-content">
-                      <span className="stat-value">{(statsCounter4.count / 1000).toFixed(1)}M</span>
-                      <span className="stat-label">Words Generated</span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Enhanced Features Grid */}
-              <section id="feature-grid" className="features-section">
-                <div className="section-heading-enhanced">
-                  <span className="section-badge">Features</span>
-                  <h2 className="section-title-enhanced">Everything You Need to Write</h2>
-                  <p className="section-subtitle-enhanced">
-                    Powerful AI tools designed for storytellers, novelists, and creative writers.
-                  </p>
-                </div>
-                
-                <div className="features-grid-enhanced">
-                  {featureHighlights.map((feature, index) => (
-                    <div 
-                      key={feature.title} 
-                      className={`feature-card-enhanced ${hoveredFeature === index ? 'hovered' : ''}`}
-                      onMouseEnter={() => setHoveredFeature(index)}
-                      onMouseLeave={() => setHoveredFeature(null)}
-                      style={{ '--card-gradient': feature.gradient }}
-                    >
-                      <div className="feature-icon-wrapper" style={{ background: feature.gradient }}>
-                        <span className="feature-icon">{feature.icon}</span>
-                      </div>
-                      <h3 className="feature-title">{feature.title}</h3>
-                      <p className="feature-description">{feature.description}</p>
-                      <div className="feature-glow"></div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Enhanced How It Works */}
-              <section id="how-it-works" className="how-it-works-section">
-                <div className="section-heading-enhanced">
-                  <span className="section-badge">Process</span>
-                  <h2 className="section-title-enhanced">How Storynexis Works</h2>
-                  <p className="section-subtitle-enhanced">
-                    From initial idea to published chapter in four simple steps.
-                  </p>
-                </div>
-                
-                <div className="steps-timeline">
-                  {howItWorksSteps.map((step, index) => (
-                    <div key={step.title} className="step-card-enhanced">
-                      <div className="step-connector">
-                        <div className="step-number-circle">{step.number}</div>
-                        {index < howItWorksSteps.length - 1 && <div className="step-line"></div>}
-                      </div>
-                      <div className="step-content">
-                        <div className="step-icon-large">{step.icon}</div>
-                        <h3 className="step-title">{step.title}</h3>
-                        <p className="step-description">{step.description}</p>
-                        <span className="step-detail">{step.detail}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Story Showcase */}
-              <section id="story-showcase" className="showcase-section-enhanced">
-                <div className="section-heading-enhanced">
-                  <span className="section-badge">Gallery</span>
-                  <h2 className="section-title-enhanced">Stories Created with Storynexis</h2>
-                  <p className="section-subtitle-enhanced">
-                    Explore what other writers have crafted using our AI.
-                  </p>
-                </div>
-                
-                <div className="showcase-grid-enhanced">
-                  {showcaseStories.map((story) => (
-                    <div key={story.title} className="showcase-card-enhanced">
-                      <div className="showcase-cover" style={{ '--genre-color': genrePalette[story.genre] || '#94a3b8' }}>
-                        <span className="showcase-emoji">{story.cover}</span>
-                      </div>
-                      <div className="showcase-content">
-                        <span className="showcase-genre-tag" style={{ color: genrePalette[story.genre] }}>{story.genre}</span>
-                        <h4 className="showcase-title">{story.title}</h4>
-                        <p className="showcase-blurb">{story.blurb}</p>
-                        <div className="showcase-meta">
-                          <span>📖 {story.chapters} chapters</span>
-                          <span>📝 {story.wordCount} words</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Testimonials Section */}
-              <section className="testimonials-section">
-                <div className="section-heading-enhanced">
-                  <span className="section-badge">Reviews</span>
-                  <h2 className="section-title-enhanced">Loved by Writers Worldwide</h2>
-                </div>
-                
-                <div className="testimonials-carousel">
-                  {testimonials.map((testimonial, index) => (
-                    <div 
-                      key={testimonial.name} 
-                      className={`testimonial-card ${index === activeTestimonial ? 'active' : ''}`}
-                    >
-                      <div className="testimonial-stars">
-                        {[...Array(testimonial.rating)].map((_, i) => (
-                          <span key={i} className="star">⭐</span>
-                        ))}
-                      </div>
-                      <p className="testimonial-text">"{testimonial.text}"</p>
-                      <div className="testimonial-author">
-                        <span className="testimonial-avatar">{testimonial.avatar}</span>
-                        <div className="testimonial-info">
-                          <span className="testimonial-name">{testimonial.name}</span>
-                          <span className="testimonial-role">{testimonial.role}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="testimonial-dots">
-                  {testimonials.map((_, index) => (
-                    <button 
-                      key={index}
-                      className={`dot ${index === activeTestimonial ? 'active' : ''}`}
-                      onClick={() => setActiveTestimonial(index)}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              {/* Enhanced FAQ Section */}
-              <section id="faq" className="faq-section-enhanced">
-                <div className="section-heading-enhanced">
-                  <span className="section-badge">FAQ</span>
-                  <h2 className="section-title-enhanced">Frequently Asked Questions</h2>
-                </div>
-                
-                <div className="faq-list-enhanced">
-                  {faqList.map((item, index) => (
-                    <div 
-                      key={item.question} 
-                      className={`faq-item-enhanced ${activeFaq === index ? 'open' : ''}`}
-                    >
-                      <button 
-                        className="faq-question-enhanced" 
-                        onClick={() => handleFaqToggle(index)}
-                      >
-                        <span className="faq-q-icon">Q</span>
-                        <span className="faq-q-text">{item.question}</span>
-                        <span className="faq-toggle-icon">{activeFaq === index ? '−' : '+'}</span>
-                      </button>
-                      <div className={`faq-answer-enhanced ${activeFaq === index ? 'show' : ''}`}>
-                        <p>{item.answer}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </div>
-        </div>
-
-        <footer className="footer-bar">
-          <div className="footer-content">
-            <div className="footer-main">
-              <div className="footer-brand">
-                <div className="brand">
-                  <span className="brand-icon">📖</span>
-                  <span>Storynexis</span>
-                </div>
-                <p>AI-powered storytelling for writers, creators, and narrative teams.</p>
-              </div>
-              <div className="footer-links">
-                <div className="footer-column">
-                  <h4>Product</h4>
-                  <a href="#site-hero">Overview</a>
-                  <a href="#feature-grid">Features</a>
-                  <a href="#story-showcase">Examples</a>
-                </div>
-                <div className="footer-column">
-                  <h4>Resources</h4>
-                  <a href="#faq-hub">FAQ</a>
-                  <a href="#">Documentation</a>
-                  <a href="#">API</a>
-                  <a href="#">Support</a>
-                </div>
-                <div className="footer-column">
-                  <h4>Company</h4>
-                  <a href="#">About</a>
-                  <a href="#">Blog</a>
-                  <a href="#">Careers</a>
-                  <a href="#">Contact</a>
-                </div>
-              </div>
-            </div>
-            <div className="footer-bottom">
-              <p>© 2026 Storynexis • Interactive AI Storytelling</p>
-              <div className="footer-legal">
-                <a href="#">Privacy Policy</a>
-                <a href="#">Terms of Service</a>
-                <a href="#">Cookies</a>
-              </div>
-            </div>
-          </div>
-        </footer>
+  return (
+    <div className="app-wrapper">
+      {loading && <StoryGenerationLoader onCancel={handleCancelGeneration} />}
+      {/* Animated background particles */}
+      <div className="hero-particles">
+        <div className="particle"></div>
+        <div className="particle"></div>
+        <div className="particle"></div>
+        <div className="particle"></div>
+        <div className="particle"></div>
+        <div className="particle"></div>
       </div>
-    );
+
+      <nav className="title-bar">
+        <div className="title-bar-content">
+          <div className="brand" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+            <span className="brand-icon">📖</span>
+            <span>Storynexis</span>
+          </div>
+          <button className="hamburger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+            {navLinks.map((link) => (
+              <button key={link.label} className="nav-link" onClick={() => { scrollToSection(link.target); setMobileMenuOpen(false); }}>
+                {link.label}
+              </button>
+            ))}
+          </div>
+          <div className="nav-actions">
+            {user ? (
+              <>
+                <button className="nav-link nav-ghost" onClick={() => navigate('/profile')}>
+                  👤 Profile
+                </button>
+                <button className="btn-nav" onClick={handleLogout}>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="nav-link nav-ghost" onClick={() => navigate('/login')}>Log In</button>
+                <button className="btn-nav" onClick={() => navigate('/signup')}>Sign Up Free</button>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      <div className="app-container">
+        <div className="view-transition">
+          <div className="initial-screen">
+            {/* Enhanced Hero Section - Compact Layout */}
+            <section id="site-hero" className="hero-section hero-compact">
+              <div className="hero-split">
+                {/* Left: Text Content */}
+                <div className="hero-text-side">
+                  <h1 className="hero-title-animated">
+                    {heroTitle.displayText}
+                    <span className={`cursor ${heroTitle.isComplete ? 'blink' : ''}`}>|</span>
+                  </h1>
+                  <p className="hero-subtitle-compact">
+                    An AI writing tool that adapts to your voice. Pick a genre, describe your idea, and start drafting in seconds.
+                  </p>
+                </div>
+
+                {/* Right: Prompt Panel */}
+                <div className="hero-form-side">
+                  <div className="prompt-panel-compact">
+                    <div className="prompt-panel-header">
+                      <span className="prompt-icon">✍️</span>
+                      <h3>Start Your Story</h3>
+                    </div>
+
+                    <div className="prompt-form">
+                      <div className="form-group">
+                        {/* <label>Story Title</label> */}
+                        <input
+                          className="form-input"
+                          placeholder="e.g. The Last Cartographer"
+                          value={storyTitle}
+                          onChange={(e) => setStoryTitle(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        {/* <label>Story Idea</label> */}
+                        <textarea
+                          className="form-textarea"
+                          rows="3"
+                          placeholder="A retired astronaut discovers coordinates hidden in her daughter's drawings..."
+                          value={openingLine}
+                          onChange={(e) => setOpeningLine(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Inline Genre Selection */}
+                      <div className="form-group">
+                        {/* <label>Genre</label> */}
+                        <div className="genre-inline-row">
+                          {['Any Genre', 'Fantasy', 'Romance', 'Mystery', 'Sci-Fi', 'Horror', 'Thriller'].map((chip) => (
+                            <button
+                              key={chip}
+                              className={`genre-chip-inline ${genre === chip ? 'active' : ''}`}
+                              onClick={() => setGenre(chip)}
+                              style={{ '--chip-color': genrePalette[chip] || '#94a3b8' }}
+                            >
+                              {chip}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {error && <div className="error-message-enhanced">{error}</div>}
+
+                      <button className="btn-primary-enhanced" onClick={handleStartStory} disabled={loading}>
+                        {loading ? (
+                          <>
+                            <span className="loading-spinner"></span>
+                            <span>Creating...</span>
+                          </>
+                        ) : (
+                          <span>Start writing</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* More Genres - Collapsible */}
+              <details className="more-genres-section">
+                <summary className="more-genres-toggle">
+                  <span>More Genres</span>
+                  <span className="toggle-arrow">▼</span>
+                </summary>
+                <div className="genre-chip-row-expanded">
+                  {heroGenres.filter(g => !['Any Genre', 'Fantasy', 'Romance', 'Mystery', 'Sci-Fi', 'Horror', 'Thriller'].includes(g)).map((chip) => (
+                    <button
+                      key={chip}
+                      className={`genre-chip-enhanced ${genre === chip ? 'active' : ''}`}
+                      onClick={() => setGenre(chip)}
+                      style={{ '--chip-color': genrePalette[chip] || '#94a3b8' }}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            </section>
+
+
+
+            <section id="feature-grid" className="features-section">
+              <div className="section-heading-enhanced">
+                <h2 className="section-title-enhanced">Built for the way you write</h2>
+                <p className="section-subtitle-enhanced">
+                  Tools that stay out of your way until you need them.
+                </p>
+              </div>
+
+              <div className="features-grid-enhanced">
+                {featureHighlights.map((feature, index) => (
+                  <div
+                    key={feature.title}
+                    className={`feature-card-enhanced ${hoveredFeature === index ? 'hovered' : ''}`}
+                    onMouseEnter={() => setHoveredFeature(index)}
+                    onMouseLeave={() => setHoveredFeature(null)}
+                  >
+                    <div className="feature-accent-line" style={{ background: feature.accentColor }}></div>
+                    <h3 className="feature-title">{feature.title}</h3>
+                    <p className="feature-description">{feature.description}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section id="how-it-works" className="how-it-works-section">
+              <div className="section-heading-enhanced">
+                <h2 className="section-title-enhanced">Four steps. That's it.</h2>
+              </div>
+
+              <div className="steps-timeline">
+                {howItWorksSteps.map((step, index) => (
+                  <div key={step.title} className="step-card-enhanced">
+                    <div className="step-connector">
+                      <div className="step-number-circle">{step.number}</div>
+                      {index < howItWorksSteps.length - 1 && <div className="step-line"></div>}
+                    </div>
+                    <div className="step-content">
+                      <h3 className="step-title">{step.title}</h3>
+                      <p className="step-description">{step.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section id="story-showcase" className="showcase-section-enhanced">
+              <div className="section-heading-enhanced">
+                <h2 className="section-title-enhanced">Written with Storynexis</h2>
+                <p className="section-subtitle-enhanced">
+                  Real stories crafted by our community.
+                </p>
+              </div>
+
+              <div className="showcase-grid-enhanced">
+                {showcaseStories.map((story) => (
+                  <div key={story.title} className="showcase-card-enhanced">
+                    <div className="showcase-cover" style={{ '--genre-color': genrePalette[story.genre] || '#94a3b8' }}>
+                      <span className="showcase-emoji">{story.cover}</span>
+                    </div>
+                    <div className="showcase-content">
+                      <span className="showcase-genre-tag" style={{ color: genrePalette[story.genre] }}>{story.genre}</span>
+                      <h4 className="showcase-title">{story.title}</h4>
+                      <p className="showcase-blurb">{story.blurb}</p>
+                      <div className="showcase-meta">
+                        <span>{story.chapters} chapters</span>
+                        <span>{story.wordCount} words</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="testimonials-section">
+              <div className="section-heading-enhanced">
+                <h2 className="section-title-enhanced">What writers are saying</h2>
+              </div>
+
+              <div className="testimonials-carousel">
+                {testimonials.map((testimonial, index) => (
+                  <div
+                    key={testimonial.name}
+                    className={`testimonial-card ${index === activeTestimonial ? 'active' : ''}`}
+                  >
+                    <div className="testimonial-quote-mark">&ldquo;</div>
+                    <p className="testimonial-text">{testimonial.text}</p>
+                    <div className="testimonial-author">
+                      <span className="testimonial-initials">{testimonial.initials}</span>
+                      <div className="testimonial-info">
+                        <span className="testimonial-name">{testimonial.name}</span>
+                        <span className="testimonial-role">{testimonial.role}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="testimonial-dots">
+                {testimonials.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`dot ${index === activeTestimonial ? 'active' : ''}`}
+                    onClick={() => setActiveTestimonial(index)}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section id="faq" className="faq-section-enhanced">
+              <div className="section-heading-enhanced">
+                <h2 className="section-title-enhanced">Common questions</h2>
+              </div>
+
+              <div className="faq-list-enhanced">
+                {faqList.map((item, index) => (
+                  <div
+                    key={item.question}
+                    className={`faq-item-enhanced ${activeFaq === index ? 'open' : ''}`}
+                  >
+                    <button
+                      className="faq-question-enhanced"
+                      onClick={() => handleFaqToggle(index)}
+                    >
+                      <span className="faq-q-text">{item.question}</span>
+                      <span className="faq-chevron">{activeFaq === index ? '−' : '+'}</span>
+                    </button>
+                    <div className={`faq-answer-enhanced ${activeFaq === index ? 'show' : ''}`}>
+                      <p>{item.answer}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <footer className="footer-bar">
+        <div className="footer-content">
+          <div className="footer-simple">
+            <div className="footer-brand">
+              <div className="brand">
+                <span className="brand-icon">📖</span>
+                <span>Storynexis</span>
+              </div>
+              <p>AI-assisted story writing.</p>
+            </div>
+            <div className="footer-nav-links">
+              <a href="#site-hero">Overview</a>
+              <a href="#feature-grid">Features</a>
+              <a href="#story-showcase">Stories</a>
+              <a href="#faq">FAQ</a>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <p>© 2026 Storynexis</p>
+            <div className="footer-legal">
+              <a href="#">Privacy</a>
+              <a href="#">Terms</a>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
 }
 
-function EditorPage({ 
+function EditorPage({
   stats, tone, setTone, length, setLength, resultCount, setResultCount,
   error, loading, handleGenerateContinuation, handleNewBook, storyTitle,
   genre, storyBeats, handleCopyStory, copyStatus, showModal, setShowModal,
   generatedOptions, handleChooseContinuation, getToneColor
 }) {
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-    const handleLogout = async () => {
-      try {
-        await logout();
-        navigate('/login');
-      } catch (error) {
-        console.error('Logout failed:', error);
-      }
-    };
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
-    return (
-      <div className="app-wrapper">
-        <nav className="title-bar">
-          <div className="title-bar-content">
-            <div className="brand">
-              <span className="brand-icon">📖</span>
-              <span>Storynexis</span>
-            </div>
-            <div className="nav-actions">
-              <span className="word-count-chip">{stats.words} Words</span>
-              {user && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    {user.displayName || user.email}
-                  </span>
-                  <button 
-                    onClick={handleLogout}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '0.875rem',
-                      background: '#fff',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+  return (
+    <div className="app-wrapper">
+      <nav className="title-bar">
+        <div className="title-bar-content">
+          <div className="brand">
+            <span className="brand-icon">📖</span>
+            <span>Storynexis</span>
           </div>
-        </nav>
+          <div className="nav-actions">
+            <span className="word-count-chip">{stats.words} Words</span>
+            {user && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  {user.displayName || user.email}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.875rem',
+                    background: '#fff',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
 
-        <div className="app-container">
-          <div className="view-transition">
-            <div className="writing-layout">
-              
-              {/* Left: Controls */}
-              <div className="controls-panel">
-                <div className="controls-card">
-                  <h3 className="controls-title">Story Controls</h3>
-                  
-                  <div className="form-group">
-                    <label>Length</label>
-                    <select className="form-select" value={length} onChange={(e) => setLength(e.target.value)}>
-                      <option value="">Select Length</option>
-                      <option value="Short">Short (~50 words)</option>
-                      <option value="Medium">Medium (~100 words)</option>
-                      <option value="Long">Long (~150 words)</option>
-                    </select>
-                  </div>
+      <div className="app-container">
+        <div className="view-transition">
+          <div className="writing-layout">
 
-                  {error && <div className="error-message">{error}</div>}
+            {/* Left: Controls */}
+            <div className="controls-panel">
+              <div className="controls-card">
+                <h3 className="controls-title">Story Controls</h3>
 
-                  <button onClick={handleGenerateContinuation} className="btn-primary" disabled={loading} style={{ marginBottom: '15px' }}>
-                     {loading ? <><span className="loading-spinner"></span> Writing...</> : '🔮 Generate Next'}
-                  </button>
+                <div className="form-group">
+                  <label>Length</label>
+                  <select className="form-select" value={length} onChange={(e) => setLength(e.target.value)}>
+                    <option value="">Select Length</option>
+                    <option value="Short">Short (~50 words)</option>
+                    <option value="Medium">Medium (~100 words)</option>
+                    <option value="Long">Long (~150 words)</option>
+                  </select>
+                </div>
 
-                  <button onClick={handleNewBook} className="btn-outline" style={{ width: '100%' }}>Start New Story</button>
+                {error && <div className="error-message">{error}</div>}
+
+                <button onClick={handleGenerateContinuation} className="btn-primary" disabled={loading} style={{ marginBottom: '15px' }}>
+                  {loading ? <><span className="loading-spinner"></span> Writing...</> : '🔮 Generate Next'}
+                </button>
+
+                <button onClick={handleNewBook} className="btn-outline" style={{ width: '100%' }}>Start New Story</button>
+              </div>
+            </div>
+
+            {/* Right: Story Book */}
+            <div className="story-column">
+              <div className="insight-panel">
+                <div className="insight-card">
+                  <span>Chapters</span>
+                  <strong>{stats.chapters}</strong>
+                </div>
+                <div className="insight-card">
+                  <span>Word Count</span>
+                  <strong>{stats.words.toLocaleString()}</strong>
+                </div>
+                <div className="insight-card">
+                  <span>Reading Time</span>
+                  <strong>{stats.readingMinutes ? `${stats.readingMinutes} min` : '—'}</strong>
                 </div>
               </div>
 
-              {/* Right: Story Book */}
-              <div className="story-column">
-                <div className="insight-panel">
-                  <div className="insight-card">
-                    <span>Chapters</span>
-                    <strong>{stats.chapters}</strong>
-                  </div>
-                  <div className="insight-card">
-                    <span>Word Count</span>
-                    <strong>{stats.words.toLocaleString()}</strong>
-                  </div>
-                  <div className="insight-card">
-                    <span>Reading Time</span>
-                    <strong>{stats.readingMinutes ? `${stats.readingMinutes} min` : '—'}</strong>
-                  </div>
-                </div>
-
-                <div className="story-utilities">
-                  <button onClick={handleCopyStory} className="btn-outline copy-button">📋 Copy Story</button>
-                  {copyStatus && <span className="copy-status">{copyStatus}</span>}
-                </div>
-
-                <div className="story-panel">
-                  <div className="story-header">
-                    <h2>{storyTitle}</h2>
-                    <span className="genre-badge" style={{ background: genrePalette[genre] || '#ccc' }}>{genre}</span>
-                  </div>
-                  
-                  <div className="story-content">
-                    {storyBeats.map((beat) => (
-                      <div key={beat.id} className="story-paragraph">
-                        {beat.text}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="story-utilities">
+                <button onClick={handleCopyStory} className="btn-outline copy-button">📋 Copy Story</button>
+                {copyStatus && <span className="copy-status">{copyStatus}</span>}
               </div>
 
+              <div className="story-panel">
+                <div className="story-header">
+                  <h2>{storyTitle}</h2>
+                  <span className="genre-badge" style={{ background: genrePalette[genre] || '#ccc' }}>{genre}</span>
+                </div>
+
+                <div className="story-content">
+                  {storyBeats.map((beat) => (
+                    <div key={beat.id} className="story-paragraph">
+                      {beat.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-custom">
+              <h3>Choose a Path</h3>
+              <button onClick={() => setShowModal(false)} className="close-btn">&times;</button>
+            </div>
+
+            <div className="options-grid">
+              {generatedOptions.map((option, idx) => (
+                <div key={idx} className="option-card" onClick={() => handleChooseContinuation(option)}>
+                  <div className="option-meta">
+                    <span className="tone-tag" style={{ color: getToneColor(option.tone) }}>{option.tone}</span>
+                  </div>
+                  <p className="option-text">{option.text}</p>
+                  <div className="option-select-hint">Select This Path →</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-
-        {showModal && (
-          <div className="modal-overlay" onClick={() => setShowModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header-custom">
-                <h3>Choose a Path</h3>
-                <button onClick={() => setShowModal(false)} className="close-btn">&times;</button>
-              </div>
-              
-              <div className="options-grid">
-                {generatedOptions.map((option, idx) => (
-                  <div key={idx} className="option-card" onClick={() => handleChooseContinuation(option)}>
-                    <div className="option-meta">
-                      <span className="tone-tag" style={{ color: getToneColor(option.tone) }}>{option.tone}</span>
-                    </div>
-                    <p className="option-text">{option.text}</p>
-                    <div className="option-select-hint">Select This Path →</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
+      )}
+    </div>
+  );
 }
 
 export default App;

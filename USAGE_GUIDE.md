@@ -51,24 +51,29 @@ npm run dev
 1. **Start Your Story**
    - Select a genre (Fantasy, Romance, Horror, Science Fiction, Mystery, Adventure)
    - Enter a story title
-   - Write an opening line (Optional - AI will generate if left blank)
-   - Click "Start Story"
+   - Write your story in the editor
 
 2. **Generate Continuations**
    - Choose a tone (Dark, Emotional, Humorous, Inspirational, Mysterious, Adaptive)
    - Select length (Short, Medium, Long)
-   - Choose how many options to generate (1-3)
-   - Optionally add your own idea or direction
-   - Click "Generate Continuation"
+   - Optionally add your own idea or direction in the "Direction" field
+   - Click "✨ Generate Continuation" button in the sidebar
 
 3. **Build Your Story**
-   - Review the AI-generated options
-   - Select the one that fits your narrative
-   - Repeat to continue building your story
+   - Review the AI-generated options in the popup modal
+   - Select the option that fits your narrative
+   - The selected text will be appended to your story
+   - Continue writing and generating as needed
 
-4. **Save Your Work**
-   - Click "💾 Save Book" to download as .txt file
-   - Click "➕ New Book" to start a new story
+4. **Manage Your Story**
+   - Use Ctrl+Z / Ctrl+Y for undo/redo
+   - Organize content into chapters
+   - Toggle focus mode for distraction-free writing
+
+5. **Save Your Work**
+   - Click "💾 Save to History" to save current version
+   - Click "📥 Download" to save as .txt file
+   - Access previous versions from history
 
 ## 🔧 Technical Details
 
@@ -105,7 +110,8 @@ Generate story continuations
   "count": 3,
   "max_length": 150,
   "temperature": 0.8,
-  "top_p": 0.9
+  "top_p": 0.9,
+  "custom_prompt": "Optional: Add specific direction here"
 }
 ```
 
@@ -115,6 +121,12 @@ Generate story continuations
   {
     "id": "gen-0-1234",
     "text": "Generated continuation text...",
+    "tone": "Dark",
+    "length": "Medium"
+  },
+  {
+    "id": "gen-1-1234",
+    "text": "Alternative continuation...",
     "tone": "Dark",
     "length": "Medium"
   }
@@ -215,10 +227,14 @@ Generate story continuations
 - Async request handling
 
 ### Frontend Architecture
-- React 19.2.3 with hooks
+- React 19.2.3 with hooks and context API
+- React Router for navigation
+- Firebase Authentication integration
 - Vite for fast development builds
-- Pure CSS styling
-- No external UI libraries
+- Pure CSS styling with responsive design
+- Focus mode for distraction-free writing
+- Chapter management system
+- Undo/Redo history tracking
 
 ## 🔐 Security Notes
 

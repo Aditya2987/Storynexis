@@ -220,7 +220,7 @@ const Signup = () => {
                   disabled={loading}
                   autoComplete="name"
                 />
-                <label htmlFor="displayName">Full Name</label>
+                {/* <label htmlFor="displayName">Full Name</label> */}
               </div>
             </div>
 
@@ -244,7 +244,7 @@ const Signup = () => {
                   disabled={loading}
                   autoComplete="email"
                 />
-                <label htmlFor="email">Email Address</label>
+                {/* <label htmlFor="email">Email Address</label> */}
               </div>
             </div>
 
@@ -263,12 +263,12 @@ const Signup = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder="••••••••"
+                  placeholder="Password"
                   required
                   disabled={loading}
                   autoComplete="new-password"
                 />
-                <label htmlFor="password">Password</label>
+                {/* <label htmlFor="password">Password</label> */}
                 <button
                   type="button"
                   className="password-toggle"
@@ -322,12 +322,12 @@ const Signup = () => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   onFocus={() => setFocusedField('confirmPassword')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder="••••••••"
+                  placeholder="Confirm Password"
                   required
                   disabled={loading}
                   autoComplete="new-password"
                 />
-                <label htmlFor="confirmPassword">Confirm Password</label>
+                {/* <label htmlFor="confirmPassword">Confirm Password</label> */}
                 <button
                   type="button"
                   className="password-toggle"

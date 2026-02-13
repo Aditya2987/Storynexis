@@ -1,6 +1,9 @@
 import { auth } from '../firebase/auth';
 
-const API_URL = 'http://localhost:8000';
+// Get API URL from environment variable, fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+console.log('🌐 API URL:', API_URL);
 
 // Custom API Error class for better error handling
 export class ApiError extends Error {
@@ -42,6 +45,22 @@ const getBackoffDelay = (attempt, baseDelay = RETRY_CONFIG.baseDelay) => {
 const isRetryable = (status) => RETRY_CONFIG.retryableStatuses.includes(status);
 
 /**
+ * Get Firebase auth token
+ */
+const getAuthToken = async () => {
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      return await user.getIdToken(true);
+    } catch (error) {
+      console.warn('Failed to get auth token:', error);
+      return null;
+    }
+  }
+  return null;
+};
+
+/**
  * Get user-friendly error message
  */
 const getErrorMessage = (status, serverMessage) => {
@@ -57,7 +76,7 @@ const getErrorMessage = (status, serverMessage) => {
     503: 'Service unavailable. Please try again later.',
     504: 'Request timeout. Please try again.',
   };
-  
+
   return serverMessage || messages[status] || 'An unexpected error occurred.';
 };
 
@@ -69,19 +88,19 @@ const getErrorMessage = (status, serverMessage) => {
  * @param {Object} retryOptions - Retry configuration override
  */
 export const authenticatedFetch = async (
-  endpoint, 
-  options = {}, 
+  endpoint,
+  options = {},
   retryOptions = {}
 ) => {
   const config = { ...RETRY_CONFIG, ...retryOptions };
   let lastError = null;
-  
+
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
     try {
       // Get current user's ID token (if logged in)
       const user = auth.currentUser;
       let token = null;
-      
+
       if (user) {
         try {
           token = await user.getIdToken(true); // Force refresh to ensure valid token
@@ -108,6 +127,16 @@ export const authenticatedFetch = async (
       const controller = new AbortController();
       const timeoutMs = retryOptions.timeout || 180000; // Default 180s for model generation
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      // Handle external abort signal
+      if (options.signal) {
+        options.signal.addEventListener('abort', () => {
+          controller.abort();
+        });
+        if (options.signal.aborted) {
+          controller.abort();
+        }
+      }
 
       // Make the request
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -146,7 +175,7 @@ export const authenticatedFetch = async (
           await sleep(delay);
           continue;
         }
-        
+
         const errorData = await response.json().catch(() => ({}));
         throw new ApiError(
           getErrorMessage(response.status, errorData.detail),
@@ -157,7 +186,7 @@ export const authenticatedFetch = async (
       return response;
     } catch (error) {
       lastError = error;
-      
+
       // Handle abort/timeout
       if (error.name === 'AbortError') {
         if (attempt < config.maxRetries) {
@@ -168,7 +197,7 @@ export const authenticatedFetch = async (
         }
         throw new ApiError('Request timeout. Please check your connection.', 408);
       }
-      
+
       // Handle network errors
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         if (attempt < config.maxRetries) {
@@ -179,23 +208,23 @@ export const authenticatedFetch = async (
         }
         throw new ApiError('Network error. Please check your connection.', 0);
       }
-      
+
       // Re-throw API errors
       if (error instanceof ApiError) {
         throw error;
       }
-      
+
       // For unknown errors, retry
       if (attempt < config.maxRetries) {
         const delay = getBackoffDelay(attempt, config.baseDelay);
         await sleep(delay);
         continue;
       }
-      
+
       throw error;
     }
   }
-  
+
   throw lastError || new ApiError('Maximum retries exceeded', 500);
 };
 
@@ -204,19 +233,20 @@ export const authenticatedFetch = async (
  * @param {Object} params - Generation parameters
  * @param {Function} onProgress - Optional progress callback
  */
-export const generateContinuation = async (params, onProgress = null) => {
+export const generateContinuation = async (params, onProgress = null, signal = null) => {
   if (onProgress) onProgress('connecting');
-  
+
   console.log('generateContinuation called with params:', params);
-  
+
   try {
     // Use longer timeout for longer content
     const timeout = params.max_length > 500 ? 300000 : 180000; // 5min for long, 3min for short
-    console.log(`Using timeout: ${timeout/1000}s for max_length: ${params.max_length}`);
-    
+    console.log(`Using timeout: ${timeout / 1000}s for max_length: ${params.max_length}`);
+
     const response = await authenticatedFetch('/generate', {
       method: 'POST',
       body: JSON.stringify(params),
+      signal, // Pass the signal
     }, { maxRetries: 1, timeout }); // Single retry, custom timeout
 
     if (onProgress) onProgress('generating');
@@ -243,6 +273,86 @@ export const generateContinuation = async (params, onProgress = null) => {
 };
 
 /**
+ * Generate story continuation with streaming (real-time text generation)
+ * @param {Object} params - Generation parameters
+ * @param {Function} onChunk - Callback for each text chunk
+ * @param {Function} onComplete - Callback when generation completes
+ * @param {Function} onError - Callback for errors
+ * @param {AbortSignal} signal - Optional abort signal for cancellation
+ */
+export const generateContinuationStream = async (
+  params,
+  onChunk,
+  onComplete,
+  onError,
+  signal = null
+) => {
+  try {
+    const token = await getAuthToken();
+
+    const response = await fetch(`${API_URL}/generate/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
+      body: JSON.stringify(params),
+      signal  // For cancellation
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new ApiError(
+        error.detail || 'Failed to start streaming',
+        response.status
+      );
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'start') {
+              console.log('🌊 Streaming started');
+            } else if (data.type === 'chunk') {
+              onChunk(data.text);
+            } else if (data.type === 'done') {
+              console.log('✅ Streaming complete');
+              onComplete(data.fullText);
+            } else if (data.type === 'error') {
+              onError(new Error(data.message));
+            }
+          } catch (parseError) {
+            console.error('Error parsing SSE data:', parseError);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('⏹️ Generation cancelled by user');
+    } else {
+      console.error('Streaming error:', error);
+      onError(error);
+    }
+  }
+};
+
+/**
  * Get current user info from backend
  */
 export const getUserInfo = async () => {
@@ -258,9 +368,12 @@ export const getUserInfo = async () => {
 /**
  * Save story to backend
  * @param {Object} storyData - Story data to save
+ * @param {string} storyId - Optional story ID for updating existing story
  */
-export const saveStory = async (storyData) => {
-  const response = await authenticatedFetch('/stories', {
+export const saveStory = async (storyData, storyId = null) => {
+  const endpoint = storyId ? `/stories?story_id=${storyId}` : '/stories';
+
+  const response = await authenticatedFetch(endpoint, {
     method: 'POST',
     body: JSON.stringify(storyData),
   });
@@ -290,6 +403,20 @@ export const getStories = async () => {
 };
 
 /**
+ * Get a single story by ID from backend
+ * @param {string} storyId - Story ID to fetch
+ */
+export const getStoryById = async (storyId) => {
+  const response = await authenticatedFetch(`/stories/${storyId}`);
+
+  if (!response.ok) {
+    throw new ApiError('Failed to fetch story', response.status);
+  }
+
+  return response.json();
+};
+
+/**
  * Delete a story
  * @param {string} storyId - Story ID to delete
  */
@@ -300,6 +427,86 @@ export const deleteStory = async (storyId) => {
 
   if (!response.ok) {
     throw new ApiError('Failed to delete story', response.status);
+  }
+
+  return response.json();
+};
+
+/**
+ * Create a new bible item
+ */
+export const createBibleItem = async (storyId, itemData) => {
+  const response = await authenticatedFetch(`/stories/${storyId}/items`, {
+    method: 'POST',
+    body: JSON.stringify(itemData),
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Failed to create item', response.status);
+  }
+
+  return response.json();
+};
+
+/**
+ * Get bible items for a story
+ */
+export const getBibleItems = async (storyId, category = null) => {
+  let endpoint = `/stories/${storyId}/items`;
+  if (category) {
+    endpoint += `?category=${encodeURIComponent(category)}`;
+  }
+
+  const response = await authenticatedFetch(endpoint);
+
+  if (!response.ok) {
+    throw new ApiError('Failed to fetch items', response.status);
+  }
+
+  return response.json();
+};
+
+/**
+ * Update a bible item
+ */
+export const updateBibleItem = async (storyId, itemId, itemData) => {
+  const response = await authenticatedFetch(`/stories/${storyId}/items/${itemId}`, {
+    method: 'PUT',
+    body: JSON.stringify(itemData),
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Failed to update item', response.status);
+  }
+
+  return response.json();
+};
+
+/**
+ * Delete a bible item
+ */
+export const deleteBibleItem = async (storyId, itemId) => {
+  const response = await authenticatedFetch(`/stories/${storyId}/items/${itemId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Failed to delete item', response.status);
+  }
+
+  return response.json();
+};
+
+/**
+ * Auto-generate bible items from story content
+ */
+export const generateBibleItems = async (storyId) => {
+  const response = await authenticatedFetch(`/stories/${storyId}/bible/generate`, {
+    method: 'POST',
+  }, { timeout: 300000 }); // 5 min timeout for analysis
+
+  if (!response.ok) {
+    throw new ApiError('Failed to generate bible items', response.status);
   }
 
   return response.json();
@@ -320,13 +527,39 @@ export const healthCheck = async () => {
   }
 };
 
+/**
+ * Rewrite selected text
+ * @param {Object} params - { text, instruction, context }
+ */
+export const rewriteText = async (params) => {
+  const response = await authenticatedFetch('/rewrite', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Failed to rewrite text', response.status);
+  }
+
+  return response.json();
+};
+
 export default {
   ApiError,
   authenticatedFetch,
   generateContinuation,
+  generateContinuationStream,
+  rewriteText,
   getUserInfo,
   saveStory,
   getStories,
+  getStoryById,
+  getStoryById,
   deleteStory,
+  createBibleItem,
+  getBibleItems,
+  updateBibleItem,
+  deleteBibleItem,
+  generateBibleItems,
   healthCheck,
 };

@@ -55,6 +55,13 @@ export const logOut = async () => {
   }
 };
 
+export const updateDisplayName = async (newName) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No authenticated user');
+  await updateProfile(user, { displayName: newName });
+  return user;
+};
+
 export const onAuthChange = (callback) => {
   return onAuthStateChanged(auth, callback);
 };
