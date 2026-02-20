@@ -9,7 +9,7 @@ import AmbientPlayer from './AmbientPlayer';
 import { stripHtml } from '../utils/textUtils';
 import { useTTS } from '../hooks/useTTS';
 import { exportToPdf, exportToEpub } from '../utils/exportUtils';
-import { generateContinuationStream, getBibleItems, getStoryById } from '../utils/api';
+import { generateContinuationStream, getBibleItems, getStoryById, generateBibleItems } from '../utils/api';
 import { tonePalette } from '../constants/landingPageData';
 
 
@@ -36,8 +36,7 @@ const Editor = () => {
   const [autoSaveTimer, setAutoSaveTimer] = useState(null);
   // sidebarCollapsed removed - sidebar is always open in normal mode
   const [focusMode, setFocusMode] = useState(false);
-  const [showChapterModal, setShowChapterModal] = useState(false);
-  const [newChapterTitle, setNewChapterTitle] = useState('');
+
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [theme, setTheme] = useState('light'); // light, dark, sepia
   const [fontSize, setFontSize] = useState('medium'); // small, medium, large
@@ -53,6 +52,14 @@ const Editor = () => {
   const [loreItems, setLoreItems] = useState([]);
   const [editorUpdateTrigger, setEditorUpdateTrigger] = useState(0);
   const abortControllerRef = useRef(null);
+  const initialStreamAbortRef = useRef(null);
+  const isSavingRef = useRef(false); // Prevent concurrent saves
+  const errorTimerRef = useRef(null); // Track error message timer
+  const successTimerRef = useRef(null); // Track success message timer
+
+  // Whether the editor is currently streaming initial story generation
+  const [isStreamingInitial, setIsStreamingInitial] = useState(false);
+  const [bibleUpdateTrigger, setBibleUpdateTrigger] = useState(0);
 
   // Lore-Aware Context Fetching
   useEffect(() => {
@@ -100,6 +107,108 @@ const Editor = () => {
   // Load story from location state or localStorage
   useEffect(() => {
     const loadStoryData = async () => {
+      // ── NEW: stream prompt from home page ──────────────────────────────────
+      if (location.state?.streamPrompt) {
+        const { streamPrompt, initialTitle, initialGenre } = location.state;
+        console.log('🌊 Stream prompt detected — starting initial generation');
+
+        setStoryId(null);
+        setTitle(initialTitle || '');
+        setGenre(initialGenre || 'Any Genre');
+        setContent('');
+        setChapters([]);
+        setIsStreamingInitial(true);
+
+        initialStreamAbortRef.current = new AbortController();
+        const signal = initialStreamAbortRef.current.signal;
+        let accumulatedText = '';
+
+        try {
+          await generateContinuationStream(
+            {
+              prompt: streamPrompt,
+              tone: 'Adaptive',
+              length: 'Long',
+              max_length: 2000,
+            },
+            (chunk) => {
+              // onChunk — append and render word-by-word
+              accumulatedText += chunk;
+              const paragraphs = accumulatedText
+                .split('\n')
+                .filter(line => line.trim())
+                .map(line => `<p>${line}</p>`)
+                .join('');
+              setContent(paragraphs);
+              setEditorUpdateTrigger(prev => prev + 1);
+            },
+            async (fullText) => {
+              // onComplete
+              const paragraphs = fullText
+                .split('\n')
+                .filter(line => line.trim())
+                .map(line => `<p>${line}</p>`)
+                .join('');
+              setContent(paragraphs);
+              setEditorUpdateTrigger(prev => prev + 1);
+              setIsStreamingInitial(false);
+              console.log('✅ Initial story stream complete');
+
+              // ── Auto-save and Auto-extract Bible details ──────────────────
+              // Note: we pass `paragraphs` explicitly because the `content`
+              // state from the saveToCloud closure is stale at this point.
+              try {
+                setSuccessMessage('✨ Populating Story Bible...');
+                const savedStory = await saveStory(
+                  {
+                    title: initialTitle || 'Untitled Story',
+                    genre: initialGenre || 'Any Genre',
+                    content: paragraphs,
+                    settings: {},
+                    status: 'draft',
+                  },
+                  null // new story
+                );
+
+                const currentId = savedStory?.id;
+                if (currentId) {
+                  setStoryId(currentId);
+                  console.log('🔮 Auto-extracting Story Bible...');
+                  await generateBibleItems(currentId);
+
+                  const updatedLore = await getBibleItems(currentId);
+                  setLoreItems(updatedLore || []);
+                  setBibleUpdateTrigger(prev => prev + 1);
+                  setSuccessMessage('✨ Story Bible populated!');
+                  setTimeout(() => setSuccessMessage(''), 3000);
+                  console.log('✨ Story Bible auto-populated');
+                } else {
+                  setSuccessMessage('');
+                }
+              } catch (autoErr) {
+                console.error('Failed to auto-populate Story Bible:', autoErr);
+                setSuccessMessage('');
+              }
+            },
+            (err) => {
+              if (signal.aborted) return;
+              console.error('Initial stream error:', err);
+              setError('Story generation failed. You can still write manually.');
+              setTimeout(() => setError(''), 4000);
+              setIsStreamingInitial(false);
+            },
+            signal
+          );
+        } catch (err) {
+          if (!signal.aborted) {
+            console.error('Initial stream catch:', err);
+            setIsStreamingInitial(false);
+          }
+        }
+        return; // Don't fall through to loadedStory or sessionStorage
+      }
+
+      // ── Existing: load story passed from dashboard / profile ────────────────
       if (location.state?.loadedStory) {
         let story = location.state.loadedStory;
 
@@ -132,17 +241,29 @@ const Editor = () => {
       } else {
         const sessionData = sessionStorage.getItem('currentStory');
         if (sessionData) {
-          const data = JSON.parse(sessionData);
-          setTitle(data.title || '');
-          setGenre(data.genre || 'Any Genre');
-          setContent(data.content || '');
-          setChapters(data.chapters || []);
-          console.log('Restored story from session storage');
+          try {
+            const data = JSON.parse(sessionData);
+            setTitle(data.title || '');
+            setGenre(data.genre || 'Any Genre');
+            setContent(data.content || '');
+            setChapters(data.chapters || []);
+            console.log('Restored story from session storage');
+          } catch (e) {
+            console.warn('Corrupt session data, ignoring:', e);
+            sessionStorage.removeItem('currentStory');
+          }
         }
       }
     };
 
     loadStoryData();
+
+    // Cleanup: abort any in-progress initial stream when location changes
+    return () => {
+      if (initialStreamAbortRef.current) {
+        initialStreamAbortRef.current.abort();
+      }
+    };
   }, [location]);
 
   // TTS Hook
@@ -162,7 +283,7 @@ const Editor = () => {
     } catch (e) {
       console.error("Error calculating stats:", e);
     }
-  }, [content, stripHtml]);
+  }, [content]);
 
   const saveToSession = useCallback(() => {
     sessionStorage.setItem('currentStory', JSON.stringify({
@@ -173,9 +294,11 @@ const Editor = () => {
 
   // Save to cloud (Firestore via backend API)
   const saveToCloud = useCallback(async () => {
-    if (!user) return;
-    if (!title.trim()) return;
+    if (!user) return null;
+    if (!title.trim()) return null;
+    if (isSavingRef.current) return null; // Prevent concurrent saves
 
+    isSavingRef.current = true;
     try {
       setSaveStatus('saving');
       console.log('Saving to cloud...', storyId ? `Updating ${storyId}` : 'Creating new');
@@ -199,10 +322,13 @@ const Editor = () => {
       setSaveStatus('saved');
       setLastSaved(new Date());
       console.log('✅ Story saved to cloud');
+      return response;
     } catch (error) {
       console.error('Error saving to cloud:', error);
       setSaveStatus('error');
-      // Don't show error message for background saves, just indicate in status
+      return null;
+    } finally {
+      isSavingRef.current = false;
     }
   }, [user, storyId, title, genre, content]);
 
@@ -252,20 +378,6 @@ const Editor = () => {
     }
   };
 
-  const handleAddChapter = () => {
-    if (newChapterTitle.trim()) {
-      const newChapter = {
-        id: Date.now().toString(),
-        title: newChapterTitle.trim(),
-        position: content.length,
-        timestamp: new Date().toISOString()
-      };
-      setChapters([...chapters, newChapter]);
-      setContent(content + `\n\n--- Chapter ${chapters.length + 1}: ${newChapterTitle.trim()} ---\n\n`);
-      setNewChapterTitle('');
-      setShowChapterModal(false);
-    }
-  };
 
   const handleDownload = async () => {
     try {
@@ -319,6 +431,24 @@ const Editor = () => {
       setTimeout(() => setError(''), 3000);
     }
   };
+
+  const handleSyncBible = useCallback(async () => {
+    if (!storyId) return;
+    try {
+      console.log('🔄 Manually syncing Story Bible...');
+      // Ensure latest content is saved first
+      await saveToCloud();
+
+      await generateBibleItems(storyId, true); // sync=true
+
+      const updatedLore = await getBibleItems(storyId);
+      setLoreItems(updatedLore || []);
+      setBibleUpdateTrigger(prev => prev + 1);
+      console.log('✨ Story Bible synced successfully');
+    } catch (err) {
+      console.error('Manual Bible sync failed:', err);
+    }
+  }, [storyId, saveToCloud]);
 
   // AI Generation Handlers
   const handleGenerate = async () => {
@@ -416,6 +546,33 @@ const Editor = () => {
       setContent(formatted);
       setEditorUpdateTrigger(prev => prev + 1); // Force editor update
       setShowGenerationModal(false);
+
+      // ── Auto-extract Bible details after regeneration ─────────────
+      // Use `formatted` directly to avoid stale closure from saveToCloud
+      const freshContent = formatted;
+      setTimeout(async () => {
+        try {
+          setSuccessMessage('✨ Syncing Story Bible...');
+          const savedStory = await saveStory(
+            { title, genre, content: freshContent, settings: {}, status: 'draft' },
+            storyId
+          );
+          const currentId = savedStory?.id || storyId;
+          if (currentId) {
+            if (!storyId) setStoryId(currentId);
+            console.log('🔮 Auto-extracting Bible details after regeneration...');
+            await generateBibleItems(currentId);
+            const updatedLore = await getBibleItems(currentId);
+            setLoreItems(updatedLore || []);
+            setBibleUpdateTrigger(prev => prev + 1);
+            setSuccessMessage('✨ Story Bible synced!');
+            setTimeout(() => setSuccessMessage(''), 3000);
+          }
+        } catch (err) {
+          console.error('Extraction failed after regeneration:', err);
+          setSuccessMessage('');
+        }
+      }, 500); // Small delay to ensure content state is settled
     }
   };
 
@@ -497,7 +654,7 @@ const Editor = () => {
 
     setAutoSaveTimer(timer);
     return () => clearTimeout(timer);
-  }, [title, content, genre, user, saveToCloud]);
+  }, [title, content, genre, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Session storage backup (immediate)
   useEffect(() => {
@@ -618,9 +775,7 @@ const Editor = () => {
                     <button onClick={handleEpubExport} className="action-btn">
                       <span className="action-text">Download ePub</span>
                     </button>
-                    <button onClick={() => setShowChapterModal(true)} className="action-btn">
-                      <span className="action-text">Add Chapter</span>
-                    </button>
+
                     <button onClick={handleNewStory} className="action-btn danger">
                       <span className="action-text">New Story</span>
                     </button>
@@ -645,7 +800,11 @@ const Editor = () => {
                 )}
               </>
             ) : (
-              <StoryBible storyId={storyId} />
+              <StoryBible
+                storyId={storyId}
+                refreshTrigger={bibleUpdateTrigger}
+                onSync={handleSyncBible}
+              />
             )}
           </div>
         </aside>
@@ -728,27 +887,7 @@ const Editor = () => {
 
 
 
-      {/* Chapter Modal */}
-      {showChapterModal && (
-        <div className="modal-overlay" onClick={() => setShowChapterModal(false)}>
-          <div className="chapter-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Add New Chapter</h3>
-            <input
-              type="text"
-              value={newChapterTitle}
-              onChange={(e) => setNewChapterTitle(e.target.value)}
-              placeholder="Enter chapter title..."
-              className="chapter-input"
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleAddChapter()}
-            />
-            <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => setShowChapterModal(false)}>Cancel</button>
-              <button className="btn-confirm" onClick={handleAddChapter}>Add Chapter</button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Generation Modal */}
       {showGenerationModal && (
@@ -756,7 +895,14 @@ const Editor = () => {
           <div className="chapter-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
             <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{isGenerating ? 'Drafting Improvements...' : 'Review Rewritten Story'}</h3>
-              {!isGenerating && <button onClick={() => setShowGenerationModal(false)} className="close-btn" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280' }}>&times;</button>}
+              <button onClick={() => {
+                if (isGenerating && abortControllerRef.current) {
+                  abortControllerRef.current.abort();
+                  abortControllerRef.current = null;
+                  setIsGenerating(false);
+                }
+                setShowGenerationModal(false);
+              }} className="close-btn" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280' }}>&times;</button>
             </div>
 
             {generationError ? (
@@ -768,7 +914,17 @@ const Editor = () => {
             ) : isGenerating && generatedOptions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px' }}>
                 <div className="loading-spinner" style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 20px' }}></div>
-                <p style={{ color: '#6b7280' }}>AI is expanding your story...</p>
+                <p style={{ color: '#6b7280', marginBottom: '16px' }}>AI is expanding your story...</p>
+                <button onClick={() => {
+                  if (abortControllerRef.current) {
+                    abortControllerRef.current.abort();
+                    abortControllerRef.current = null;
+                  }
+                  setIsGenerating(false);
+                  setShowGenerationModal(false);
+                }} style={{ padding: '8px 24px', background: 'none', border: '1px solid #d1d5db', borderRadius: '8px', color: '#6b7280', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', transition: 'all 0.2s' }}>
+                  Cancel
+                </button>
               </div>
             ) : (
               <div className="options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '60vh', overflowY: 'auto' }}>
@@ -782,8 +938,17 @@ const Editor = () => {
                   </div>
                 ))}
                 {isGenerating && (
-                  <div style={{ padding: '12px', textAlign: 'center', color: '#6b7280', fontSize: '0.9rem', fontStyle: 'italic' }}>
-                    Continuing generation...
+                  <div style={{ padding: '12px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.9rem', fontStyle: 'italic' }}>Continuing generation...</span>
+                    <button onClick={() => {
+                      if (abortControllerRef.current) {
+                        abortControllerRef.current.abort();
+                        abortControllerRef.current = null;
+                      }
+                      setIsGenerating(false);
+                    }} style={{ padding: '6px 20px', background: 'none', border: '1px solid #d1d5db', borderRadius: '8px', color: '#6b7280', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', transition: 'all 0.2s' }}>
+                      Stop Generating
+                    </button>
                   </div>
                 )}
               </div>

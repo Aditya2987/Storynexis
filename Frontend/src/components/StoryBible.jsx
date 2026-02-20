@@ -3,7 +3,7 @@ import { getBibleItems, createBibleItem, updateBibleItem, deleteBibleItem, gener
 // Styles will be handled in Editor.css
 import './StoryBible.css';
 
-const StoryBible = ({ storyId }) => {
+const StoryBible = ({ storyId, refreshTrigger, onSync }) => {
     const [activeTab, setActiveTab] = useState('Character');
     const [items, setItems] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -11,6 +11,7 @@ const StoryBible = ({ storyId }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -22,10 +23,12 @@ const StoryBible = ({ storyId }) => {
     const CATEGORIES = ['Character', 'Location', 'Item', 'Lore'];
 
     useEffect(() => {
-        if (storyId) {
+        if (storyId && typeof storyId === 'string' && storyId.trim()) {
             fetchItems();
+        } else {
+            setItems([]);
         }
-    }, [storyId, activeTab]);
+    }, [storyId, activeTab, refreshTrigger]);
 
     const fetchItems = async () => {
         setIsLoading(true);
@@ -41,19 +44,22 @@ const StoryBible = ({ storyId }) => {
         }
     };
 
-    const handleGenerate = async () => {
-        setIsGenerating(true);
+    // handleSync triggers the parent's sync logic
+    const handleSync = async () => {
+        if (!onSync) return;
+        setIsSyncing(true);
         setError('');
         try {
-            await generateBibleItems(storyId);
+            await onSync();
             await fetchItems();
         } catch (err) {
-            setError('Failed to generate bible items. Try adding some content to your story first.');
-            console.error(err);
+            setError('Failed to sync with story.');
         } finally {
-            setIsGenerating(false);
+            setIsSyncing(false);
         }
     };
+
+    // handleGenerate removed - now automated in Editor.jsx
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -145,13 +151,29 @@ const StoryBible = ({ storyId }) => {
                         </button>
 
                         <button
-                            className="bible-generate-btn"
-                            onClick={handleGenerate}
-                            disabled={isGenerating || isLoading}
-                            title="Auto-analyze story to find characters, locations, etc."
-                            style={{ marginLeft: '10px', backgroundColor: '#646cff' }}
+                            className={`bible-generate-btn ${isSyncing ? 'syncing' : ''}`}
+                            onClick={handleSync}
+                            disabled={isSyncing || isLoading}
+                            title="Sync Bible with current story content (detects additions and removals)"
+                            style={{
+                                marginLeft: '10px',
+                                backgroundColor: isSyncing ? '#9ca3af' : '#6366f1',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
                         >
-                            {isGenerating ? 'Analyzing...' : 'Auto-Generate from Story'}
+                            {isSyncing ? (
+                                <>
+                                    <span style={{ animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>↻</span>
+                                    Syncing...
+                                </>
+                            ) : (
+                                <>
+                                    <span>↻</span>
+                                    Sync with Story
+                                </>
+                            )}
                         </button>
 
                         {isLoading && items.length === 0 ? (

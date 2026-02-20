@@ -95,6 +95,8 @@ export const authenticatedFetch = async (
   const config = { ...RETRY_CONFIG, ...retryOptions };
   let lastError = null;
 
+  let forceTokenRefresh = false; // Only force-refresh after a 401
+
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
     try {
       // Get current user's ID token (if logged in)
@@ -103,13 +105,11 @@ export const authenticatedFetch = async (
 
       if (user) {
         try {
-          token = await user.getIdToken(true); // Force refresh to ensure valid token
-          console.log('Token obtained successfully');
+          // Use cached token normally; only force-refresh after a 401
+          token = await user.getIdToken(forceTokenRefresh);
         } catch (tokenError) {
           console.warn('Failed to get token, continuing as guest:', tokenError);
         }
-      } else {
-        console.log('No authenticated user, proceeding as guest');
       }
 
       // Prepare headers
@@ -149,7 +149,8 @@ export const authenticatedFetch = async (
 
       // Handle 401 errors specially - retry with fresh token
       if (response.status === 401) {
-        console.log('Got 401, attempting to refresh token and retry...');
+        console.log('Got 401, will force-refresh token on retry...');
+        forceTokenRefresh = true;
         if (attempt < config.maxRetries) {
           await sleep(1000); // Wait before retry
           continue;
@@ -393,7 +394,7 @@ export const saveStory = async (storyData, storyId = null) => {
  * Get user's stories from backend
  */
 export const getStories = async () => {
-  const response = await authenticatedFetch('/stories');
+  const response = await authenticatedFetch('/stories?limit=100');
 
   if (!response.ok) {
     throw new ApiError('Failed to fetch stories', response.status);
@@ -499,9 +500,12 @@ export const deleteBibleItem = async (storyId, itemId) => {
 
 /**
  * Auto-generate bible items from story content
+ * @param {string} storyId - Story ID
+ * @param {boolean} sync - Whether to prune obsolete items
  */
-export const generateBibleItems = async (storyId) => {
-  const response = await authenticatedFetch(`/stories/${storyId}/bible/generate`, {
+export const generateBibleItems = async (storyId, sync = false) => {
+  const endpoint = `/stories/${storyId}/bible/generate${sync ? '?sync=true' : ''}`;
+  const response = await authenticatedFetch(endpoint, {
     method: 'POST',
   }, { timeout: 300000 }); // 5 min timeout for analysis
 
@@ -553,7 +557,6 @@ export default {
   getUserInfo,
   saveStory,
   getStories,
-  getStoryById,
   getStoryById,
   deleteStory,
   createBibleItem,

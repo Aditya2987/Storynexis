@@ -26,11 +26,12 @@ def get_db():
 
 
 def calculate_word_count(text: str) -> int:
-    """Calculate word count from text"""
+    """Calculate word count from text (strips HTML tags first)"""
     if not text:
         return 0
-    # Remove extra whitespace and count words
-    words = re.findall(r'\b\w+\b', text)
+    # Strip HTML tags before counting
+    clean = re.sub(r'<[^>]+>', ' ', text)
+    words = re.findall(r'\b\w+\b', clean)
     return len(words)
 
 
@@ -166,8 +167,16 @@ async def create_story(
             }
         
         # Add to Firestore
-        doc_ref = get_db().collection(STORIES_COLLECTION).document()
+        print(f"DEBUG: Attempting to create story documentation in '{STORIES_COLLECTION}'...")
+        db = get_db()
+        doc_ref = db.collection(STORIES_COLLECTION).document()
+        
+        # Explicitly check for content length to catch empty saves
+        content_len = len(story_data.get('content', ''))
+        print(f"DEBUG: Creating doc {doc_ref.id} for user {user_id}. Content length: {content_len}")
+        
         doc_ref.set(story_data)
+        print(f"✅ Success: Story document {doc_ref.id} created in Firestore.")
         
         # Return story with ID
         return {
@@ -175,7 +184,9 @@ async def create_story(
             **story_data
         }
     except Exception as e:
-        print(f"Error creating story: {e}")
+        print(f"❌ Error creating story: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to create story: {str(e)}")
 
 
@@ -279,7 +290,14 @@ async def update_story(
             update_data['metadata'] = metadata
         
         # Update in Firestore
+        print(f"DEBUG: Attempting to update story {story_id}...")
+        print(f"DEBUG: Update fields: {list(update_data.keys())}")
+        
+        if 'content' in update_data:
+            print(f"DEBUG: New content length: {len(update_data['content'])}")
+            
         doc_ref.update(update_data)
+        print(f"✅ Success: Story document {story_id} updated in Firestore.")
         
         # Return updated story
         updated_doc = doc_ref.get()

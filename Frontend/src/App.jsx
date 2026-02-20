@@ -8,6 +8,7 @@ import Dashboard from './components/Dashboard';
 import Editor from './components/Editor';
 import { generateContinuation, generateContinuationStream } from './utils/api';
 import './App.css';
+import ErrorBoundary from './components/ErrorBoundary';
 import StoryGenerationLoader from './components/StoryGenerationLoader';
 import {
   tonePalette,
@@ -218,7 +219,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppContent />
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   );
@@ -242,7 +245,7 @@ function AppContent() {
   const abortControllerRef = useRef(null);
   const generationAbortRef = useRef(false); // Keep this for logic checks, or rely on controller
 
-  const API_URL = 'http://localhost:8000';
+
 
   // Helper function to make authenticated API calls for backward compatibility
   const makeAuthenticatedCall = async (params, signal) => {
@@ -302,11 +305,10 @@ function AppContent() {
     }
 
     setError(null);
-    generationAbortRef.current = false; // Reset abort flag
+    generationAbortRef.current = false;
 
-    // Create new AbortController
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort(); // ensure prev is cleared
+      abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
@@ -315,93 +317,12 @@ function AppContent() {
 
     try {
       let finalTitle = trimmedTitle || 'Untitled Story';
-      let finalOpening = '';
-      let needsGeneration = false;
 
-      // Determine if we need to generate content
-      if (!trimmedTitle || !trimmedOpening) {
-        needsGeneration = true;
-      }
-
-      // If user provided both title and idea, generate opening from both
-      if (trimmedTitle && trimmedOpening) {
-        console.log('Generating opening from title and idea...');
-        finalTitle = trimmedTitle;
-
-        // Generate opening paragraph from the idea
-        try {
-          const openingPrompt = `Write a compelling story opening for a ${genre || 'fiction'} story titled "${trimmedTitle}" based on this idea: "${trimmedOpening}".
-
-Requirements:
-- Write 300-500 words (3-5 paragraphs)
-- Establish the setting and mood
-- Introduce the main character
-- Create intrigue that hooks the reader
-- Use vivid details and strong prose
-- End with a complete sentence
-- Write ONLY the story, no meta-commentary`;
-
-          const openingOptions = await makeAuthenticatedCall({
-            prompt: openingPrompt,
-            tone: 'Adaptive',
-            length: 'Long',
-            count: 1,
-            max_length: 800
-          });
-
-          if (generationAbortRef.current) return; // Check if cancelled
-
-          console.log('API Response (title+idea):', openingOptions);
-
-          if (!openingOptions || !Array.isArray(openingOptions) || openingOptions.length === 0) {
-            console.error('Invalid response format:', openingOptions);
-            throw new Error('Invalid response from server');
-          }
-
-          let generatedText = openingOptions[0].text.trim();
-
-          // Ensure text ends with proper punctuation
-          const lastChar = generatedText[generatedText.length - 1];
-          if (!['.', '!', '?', '"', "'"].includes(lastChar)) {
-            // Find the last complete sentence
-            const lastPeriod = generatedText.lastIndexOf('.');
-            const lastExclamation = generatedText.lastIndexOf('!');
-            const lastQuestion = generatedText.lastIndexOf('?');
-            const lastPunctuation = Math.max(lastPeriod, lastExclamation, lastQuestion);
-
-            if (lastPunctuation > 0) {
-              generatedText = generatedText.substring(0, lastPunctuation + 1).trim();
-              console.log('Trimmed incomplete sentence');
-            } else {
-              generatedText += '.';
-            }
-          }
-
-          finalOpening = generatedText;
-          console.log('Generated opening from title+idea:', finalOpening.substring(0, 100) + '...');
-        } catch (openingError) {
-          if (generationAbortRef.current) return;
-          console.error('Error generating opening:', openingError);
-          console.error('Error details:', openingError.message, openingError.status);
-          if (openingError.status === 401) {
-            setError('Your session has expired. Please sign out and sign in again.');
-          } else if (openingError.message?.includes('timeout') || openingError.name === 'AbortError') {
-            setError('Generation is taking too long. The server may still be processing. Please wait and try again.');
-          } else {
-            setError(`Failed to generate story opening: ${openingError.message || 'Please try again.'}`);
-          }
-          setLoading(false);
-          return;
-        }
-      }
-      // If only idea provided, generate both title and story opening
-      else if (!trimmedTitle && trimmedOpening) {
-        console.log('Generating title and opening from idea...');
-
-        // Generate title first
+      // Only generate a title if user didn't provide one
+      if (!trimmedTitle && trimmedOpening) {
+        console.log('Generating title from idea...');
         try {
           const titlePrompt = `Based on this story idea: "${trimmedOpening.substring(0, 200)}", create a compelling story title (5-8 words maximum). Reply with ONLY the title, no quotes or extra text.`;
-
           const titleOptions = await makeAuthenticatedCall({
             prompt: titlePrompt,
             tone: 'Adaptive',
@@ -412,187 +333,69 @@ Requirements:
 
           if (generationAbortRef.current) return;
 
-          console.log('API Response (title):', titleOptions);
-
-          if (!titleOptions || !Array.isArray(titleOptions) || titleOptions.length === 0) {
-            console.error('Invalid title response:', titleOptions);
-            throw new Error('Invalid title response from server');
+          if (titleOptions && Array.isArray(titleOptions) && titleOptions.length > 0) {
+            finalTitle = titleOptions[0].text.trim().replace(/^["']|["']$/g, '').split('\n')[0].split('.')[0];
+            console.log('Generated title:', finalTitle);
           }
-
-          finalTitle = titleOptions[0].text.trim().replace(/^["']|["']$/g, '').split('\n')[0].split('.')[0];
-          console.log('Generated title:', finalTitle);
         } catch (titleError) {
-          console.log('Title generation had an issue:', titleError);
-        }
-
-        // Then generate opening paragraph from the idea
-        try {
-          const openingPrompt = `Write a compelling story opening based on this concept: "${trimmedOpening}".
-
-Requirements:
-- Write 300-500 words (3-5 paragraphs)
-- Establish the setting and mood
-- Introduce the main character
-- Create intrigue that hooks the reader
-- Use vivid details and strong prose
-- End with a complete sentence
-- Write ONLY the story, no meta-commentary`;
-
-          const openingOptions = await makeAuthenticatedCall({
-            prompt: openingPrompt,
-            tone: 'Adaptive',
-            length: 'Long',
-            count: 1,
-            max_length: 800
-          });
-
           if (generationAbortRef.current) return;
-
-          console.log('API Response (idea only):', openingOptions);
-
-          if (!openingOptions || !Array.isArray(openingOptions) || openingOptions.length === 0) {
-            console.error('Invalid opening response:', openingOptions);
-            throw new Error('Invalid opening response from server');
-          }
-
-          let generatedText = openingOptions[0].text.trim();
-
-          // Ensure text ends with proper punctuation
-          const lastChar = generatedText[generatedText.length - 1];
-          if (!['.', '!', '?', '"', "'"].includes(lastChar)) {
-            // Find the last complete sentence
-            const lastPeriod = generatedText.lastIndexOf('.');
-            const lastExclamation = generatedText.lastIndexOf('!');
-            const lastQuestion = generatedText.lastIndexOf('?');
-            const lastPunctuation = Math.max(lastPeriod, lastExclamation, lastQuestion);
-
-            if (lastPunctuation > 0) {
-              generatedText = generatedText.substring(0, lastPunctuation + 1).trim();
-              console.log('Trimmed incomplete sentence');
-            } else {
-              generatedText += '.';
-            }
-          }
-
-          finalOpening = generatedText;
-          console.log('Generated opening:', finalOpening.substring(0, 100) + '...');
-        } catch (openingError) {
-          if (generationAbortRef.current) return;
-          console.error('Error generating opening:', openingError);
-          // Don't use the raw idea as opening - this causes confusion
-          setError('Failed to generate story opening. Please try again.');
-          setLoading(false);
-          return; // Stop here - don't proceed to writing view
-        }
-
-        // Verify we have both title and opening before proceeding
-        if (!finalTitle || !finalOpening) {
-          setError('Failed to generate complete story. Please try again.');
-          setLoading(false);
-          return;
-        }
-      }
-      // If only title provided, generate opening
-      else if (trimmedTitle && !trimmedOpening) {
-        console.log('Generating opening from title...');
-
-        const openingPrompt = `Write a compelling story opening for a ${genre || 'fiction'} story titled "${trimmedTitle}".
-
-Requirements:
-- Write 300-500 words (3-5 paragraphs)
-- Establish the setting and mood
-- Introduce the main character
-- Create intrigue that hooks the reader
-- Use vivid details and strong prose
-- End with a complete sentence
-- Write ONLY the story, no meta-commentary`;
-
-        try {
-          const openingOptions = await makeAuthenticatedCall({
-            prompt: openingPrompt,
-            tone: 'Adaptive',
-            length: 'Long',
-            count: 1,
-            max_length: 800
-          });
-
-          if (generationAbortRef.current) return;
-
-          let generatedText = (openingOptions[0].text || '').trim();
-
-          // Ensure text ends with proper punctuation
-          const lastChar = generatedText[generatedText.length - 1];
-          if (!['.', '!', '?', '"', "'"].includes(lastChar)) {
-            // Find the last complete sentence
-            const lastPeriod = generatedText.lastIndexOf('.');
-            const lastExclamation = generatedText.lastIndexOf('!');
-            const lastQuestion = generatedText.lastIndexOf('?');
-            const lastPunctuation = Math.max(lastPeriod, lastExclamation, lastQuestion);
-
-            if (lastPunctuation > 0) {
-              generatedText = generatedText.substring(0, lastPunctuation + 1).trim();
-              console.log('Trimmed incomplete sentence');
-            } else {
-              generatedText += '.';
-            }
-          }
-
-          finalOpening = generatedText;
-          console.log('Generated opening:', finalOpening.substring(0, 100) + '...');
-        } catch (openingError) {
-          if (generationAbortRef.current) return;
-          console.error('Error generating opening:', openingError);
-          setError('Failed to generate story opening. Please try again.');
-          setLoading(false);
-          return; // Stop here - don't proceed
+          console.log('Title generation failed, using fallback:', titleError);
+          finalTitle = trimmedOpening.substring(0, 50).split(' ').slice(0, 6).join(' ');
         }
       }
 
       if (generationAbortRef.current) return;
 
-      // Final verification - must have both title and opening
-      if (!finalTitle || !finalOpening || finalOpening.trim() === '') {
-        console.error('Verification failed - Title:', finalTitle, 'Opening:', finalOpening);
-        setError('Failed to generate story. Please try again.');
-        setLoading(false);
-        return;
+      // Build the stream prompt — the actual story is generated in the Editor word-by-word
+      let streamPrompt;
+      if (trimmedTitle && trimmedOpening) {
+        streamPrompt = `Write a compelling, detailed ${genre || 'fiction'} story titled "${finalTitle}" based on this idea: "${trimmedOpening}".
+
+Requirements:
+- Write at least 500-800 words (5-8 paragraphs)
+- Establish the setting and mood vividly
+- Introduce the main character with depth
+- Create intrigue that hooks the reader
+- Use vivid details and strong prose
+- Build narrative tension
+- Write ONLY the story, no meta-commentary or titles`;
+      } else if (trimmedOpening) {
+        streamPrompt = `Write a compelling, detailed story based on this concept: "${trimmedOpening}".
+
+Requirements:
+- Write at least 500-800 words (5-8 paragraphs)
+- Establish the setting and mood vividly
+- Introduce the main character with depth
+- Create intrigue that hooks the reader
+- Use vivid details and strong prose
+- Build narrative tension
+- Write ONLY the story, no meta-commentary or titles`;
+      } else {
+        streamPrompt = `Write a compelling, detailed ${genre || 'fiction'} story titled "${finalTitle}".
+
+Requirements:
+- Write at least 500-800 words (5-8 paragraphs)
+- Establish the setting and mood vividly
+- Introduce the main character with depth
+- Create intrigue that hooks the reader
+- Use vivid details and strong prose
+- Build narrative tension
+- Write ONLY the story, no meta-commentary or titles`;
       }
 
-      const openingBeat = {
-        id: Date.now().toString(),
-        text: finalOpening,
-        tone: 'Opening',
-        length: 'Intro',
-        timestamp: new Date().toISOString(),
-      };
-
-      console.log('Story ready - Title:', finalTitle, 'Opening length:', finalOpening.length);
-      setStoryBeats([openingBeat]);
-      setStoryTitle(finalTitle);
-      setOpeningLine(finalOpening);
-
-      // Prepare story data for Editor
-      const storyData = {
-        id: Date.now().toString(),
-        title: finalTitle,
-        genre: genre || 'Any Genre',
-        content: finalOpening,
-        chapters: [],
-        createdAt: new Date().toISOString(),
-      };
-
-      // Save to sessionStorage as backup
-      sessionStorage.setItem('currentStory', JSON.stringify(storyData));
-
-      // Navigate to editor with story data
-      navigate('/edit', { state: { loadedStory: storyData } });
+      // Navigate to editor immediately — streaming happens there word-by-word
+      navigate('/edit', {
+        state: {
+          streamPrompt,
+          initialTitle: finalTitle,
+          initialGenre: genre || 'Any Genre',
+        }
+      });
       setError(null);
     } catch (err) {
       if (generationAbortRef.current) return;
       console.error('Generation error:', err);
       setError('Failed to start story. Please make sure the backend is running and try again.');
-      setLoading(false);
-      return; // Don't proceed to edit page on error
     } finally {
       if (!generationAbortRef.current) {
         setLoading(false);
@@ -758,6 +561,25 @@ function LandingPage({
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [hoveredFeature, setHoveredFeature] = useState(null);
   const heroTitle = useTypewriter("Write stories you actually want to read", 40, 300);
+
+  // Scroll-reveal observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -60px 0px' }
+    );
+
+    const elements = document.querySelectorAll('.scroll-reveal');
+    elements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -938,7 +760,7 @@ function LandingPage({
 
 
 
-            <section id="feature-grid" className="features-section">
+            <section id="feature-grid" className="features-section scroll-reveal">
               <div className="section-heading-enhanced">
                 <h2 className="section-title-enhanced">Built for the way you write</h2>
                 <p className="section-subtitle-enhanced">
@@ -962,7 +784,7 @@ function LandingPage({
               </div>
             </section>
 
-            <section id="how-it-works" className="how-it-works-section">
+            <section id="how-it-works" className="how-it-works-section scroll-reveal">
               <div className="section-heading-enhanced">
                 <h2 className="section-title-enhanced">Four steps. That's it.</h2>
               </div>
@@ -983,7 +805,7 @@ function LandingPage({
               </div>
             </section>
 
-            <section id="story-showcase" className="showcase-section-enhanced">
+            <section id="story-showcase" className="showcase-section-enhanced scroll-reveal">
               <div className="section-heading-enhanced">
                 <h2 className="section-title-enhanced">Written with Storynexis</h2>
                 <p className="section-subtitle-enhanced">
@@ -1011,7 +833,7 @@ function LandingPage({
               </div>
             </section>
 
-            <section className="testimonials-section">
+            <section className="testimonials-section scroll-reveal">
               <div className="section-heading-enhanced">
                 <h2 className="section-title-enhanced">What writers are saying</h2>
               </div>
@@ -1045,7 +867,7 @@ function LandingPage({
               </div>
             </section>
 
-            <section id="faq" className="faq-section-enhanced">
+            <section id="faq" className="faq-section-enhanced scroll-reveal">
               <div className="section-heading-enhanced">
                 <h2 className="section-title-enhanced">Common questions</h2>
               </div>

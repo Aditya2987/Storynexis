@@ -146,20 +146,31 @@ const Dashboard = () => {
   };
 
   const formatDate = (timestamp) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    if (!timestamp) return '—';
+    try {
+      return new Date(timestamp).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return '—';
+    }
   };
 
   const formatTimeAgo = (timestamp) => {
-    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return formatDate(timestamp);
+    if (!timestamp) return '—';
+    try {
+      const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+      if (seconds < 0 || isNaN(seconds)) return '—';
+      if (seconds < 60) return 'Just now';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+      if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+      return formatDate(timestamp);
+    } catch {
+      return '—';
+    }
   };
 
   const getInitials = (name) => {
@@ -168,10 +179,11 @@ const Dashboard = () => {
   };
 
   const getDaysSinceJoined = () => {
-    if (!user?.metadata?.creationTime) return 0;
+    if (!user?.metadata?.creationTime) return '...';
     const created = new Date(user.metadata.creationTime);
     const now = new Date();
-    return Math.floor((now - created) / (1000 * 60 * 60 * 24));
+    const days = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
   };
 
   const handleSaveDisplayName = async () => {
@@ -222,14 +234,22 @@ const Dashboard = () => {
     if (!doubleConfirm) return;
 
     try {
+      let failed = 0;
       for (const story of stories) {
-        await deleteStory(story.id);
+        try {
+          await deleteStory(story.id);
+        } catch {
+          failed++;
+        }
       }
-      setStories([]);
+      if (failed > 0) {
+        alert(`${failed} stories could not be deleted. Refreshing list.`);
+      }
+      await loadUserStories();
       setSelectedStory(null);
     } catch (err) {
       console.error('Delete all failed:', err);
-      alert('Some stories could not be deleted. Please refresh and try again.');
+      alert('Delete operation failed. Please refresh and try again.');
       loadUserStories();
     }
   };
@@ -324,18 +344,37 @@ const Dashboard = () => {
             </div>
 
             <div className="profile-quick-stats">
-              <div className="quick-stat">
-                <span className="quick-stat-value">{stats.totalStories}</span>
-                <span className="quick-stat-label">Stories</span>
-              </div>
-              <div className="quick-stat">
-                <span className="quick-stat-value">{stats.totalWords.toLocaleString()}</span>
-                <span className="quick-stat-label">Words</span>
-              </div>
-              <div className="quick-stat">
-                <span className="quick-stat-value">{stats.topGenre}</span>
-                <span className="quick-stat-label">Top Genre</span>
-              </div>
+              {loading ? (
+                <>
+                  <div className="quick-stat">
+                    <span className="quick-stat-value skeleton-loader">--</span>
+                    <span className="quick-stat-label">Stories</span>
+                  </div>
+                  <div className="quick-stat">
+                    <span className="quick-stat-value skeleton-loader">--</span>
+                    <span className="quick-stat-label">Words</span>
+                  </div>
+                  <div className="quick-stat">
+                    <span className="quick-stat-value skeleton-loader">--</span>
+                    <span className="quick-stat-label">Top Genre</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="quick-stat">
+                    <span className="quick-stat-value">{stats.totalStories}</span>
+                    <span className="quick-stat-label">Stories</span>
+                  </div>
+                  <div className="quick-stat">
+                    <span className="quick-stat-value">{stats.totalWords.toLocaleString()}</span>
+                    <span className="quick-stat-label">Words</span>
+                  </div>
+                  <div className="quick-stat">
+                    <span className="quick-stat-value">{stats.topGenre}</span>
+                    <span className="quick-stat-label">Top Genre</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -345,33 +384,64 @@ const Dashboard = () => {
           <div className="tab-content">
             {/* Stats Dashboard */}
             <div className="stats-dashboard">
-              <div className="stat-card-large primary">
-                <div className="stat-card-content">
-                  <span className="stat-card-value">{stats.totalStories}</span>
-                  <span className="stat-card-label">Stories</span>
-                </div>
-              </div>
+              {loading ? (
+                <>
+                  <div className="stat-card-large primary">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value skeleton-loader">--</span>
+                      <span className="stat-card-label">Stories</span>
+                    </div>
+                  </div>
+                  <div className="stat-card-large">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value skeleton-loader">--</span>
+                      <span className="stat-card-label">Words written</span>
+                    </div>
+                  </div>
+                  <div className="stat-card-large">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value skeleton-loader">--</span>
+                      <span className="stat-card-label">Avg per story</span>
+                    </div>
+                  </div>
+                  <div className="stat-card-large">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value skeleton-loader">--</span>
+                      <span className="stat-card-label">Top genre</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="stat-card-large primary">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value">{stats.totalStories}</span>
+                      <span className="stat-card-label">Stories</span>
+                    </div>
+                  </div>
 
-              <div className="stat-card-large">
-                <div className="stat-card-content">
-                  <span className="stat-card-value">{stats.totalWords.toLocaleString()}</span>
-                  <span className="stat-card-label">Words written</span>
-                </div>
-              </div>
+                  <div className="stat-card-large">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value">{stats.totalWords.toLocaleString()}</span>
+                      <span className="stat-card-label">Words written</span>
+                    </div>
+                  </div>
 
-              <div className="stat-card-large">
-                <div className="stat-card-content">
-                  <span className="stat-card-value">{stats.avgWords}</span>
-                  <span className="stat-card-label">Avg per story</span>
-                </div>
-              </div>
+                  <div className="stat-card-large">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value">{stats.avgWords}</span>
+                      <span className="stat-card-label">Avg per story</span>
+                    </div>
+                  </div>
 
-              <div className="stat-card-large">
-                <div className="stat-card-content">
-                  <span className="stat-card-value">{stats.topGenre}</span>
-                  <span className="stat-card-label">Top genre</span>
-                </div>
-              </div>
+                  <div className="stat-card-large">
+                    <div className="stat-card-content">
+                      <span className="stat-card-value">{stats.topGenre}</span>
+                      <span className="stat-card-label">Top genre</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="action-grid">
@@ -489,7 +559,7 @@ const Dashboard = () => {
                     <div className="story-card-body" onClick={() => handleViewStory(story)}>
                       <h3 className="story-card-title">{story.title || 'Untitled Story'}</h3>
                       <p className="story-card-preview">
-                        {story.content?.substring(0, 100)}...
+                        {story.content ? story.content.substring(0, 100) + '...' : 'No preview available'}
                       </p>
                       <div className="story-card-footer">
                         <span className="footer-meta">{story.wordCount || 0} words</span>

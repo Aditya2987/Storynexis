@@ -785,6 +785,7 @@ async def create_or_update_story(
     """
     try:
         user_id = current_user['uid']
+        print(f"DEBUG: Saving story for user {user_id}. Data: {story_data}")
         
         # Convert chapters from Pydantic models to dicts
         chapters_data = None
@@ -819,11 +820,14 @@ async def create_or_update_story(
             )
             print(f"✅ Story created with ID: {new_story['id']}, userId: {new_story['userId']}")
             return new_story
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        print(f"⚠ HTTP error in create_or_update_story: {he.detail}")
+        raise he
     except Exception as e:
-        print(f"❌ Error creating/updating story: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ CRITICAL Error in create_or_update_story: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Backend save failed: {str(e)}")
 
 @app.get("/stories", response_model=List[StoryListResponse])
 async def get_user_stories(
@@ -932,23 +936,31 @@ async def generate_bible_items(story_content: str, existing_items: List[Dict] = 
     existing_names = [item.get('name', '').lower() for item in existing_items]
     
     prompt = f"""<|im_start|>system
-You are an expert literary analyst and story bible creator. Your task is to extract key entities from a story and structure them into a JSON format.
+You are an expert literary analyst. Analyze the story and extract key entities (Characters, Locations, Items, Lore) into JSON.
 <|im_end|>
 <|im_start|>user
-Analyze the following story text and extract key Characters, Locations, Items, and Lore.
-Return a valid JSON object with a "items" key containing a list of objects.
-Each object must have:
-- "name": Name of the entity
-- "category": One of "Character", "Location", "Item", "Lore"
-- "description": specific details from the text (max 50 words)
-- "attributes": Key-value pairs of specific traits (e.g., Age, Role, Color)
+Analyze this story text and return a JSON object with:
+1. "items": A list of NEW entities found.
+2. "obsolete": A list of names from this list that are NO LONGER present or relevant: {", ".join(existing_names[:40])}
 
-Exclude these already existing entities: {", ".join(existing_names[:20])}
+Each "items" object must have:
+- "name": Entity name
+- "category": "Character", "Location", "Item", or "Lore"
+- "description": Max 50 words
+- "attributes": {{ "Trait": "Value", ... }}
 
-Story Text:
+Story:
 {truncate_context(story_content, max_tokens=3000)}
 
 Output ONLY valid JSON.
+<|im_end|>
+<|im_start|>assistant
+```json
+{{
+  "items": [],
+  "obsolete": []
+}}
+```
 <|im_end|>
 <|im_start|>assistant
 ```json
@@ -970,35 +982,44 @@ Output ONLY valid JSON.
             
         generated_ids = outputs[0][inputs.input_ids.shape[1]:]
         text = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+        print(f"DEBUG: Raw AI Bible response: {text}")
         
         # Parse JSON
         data = extract_json_from_text(text)
         
-        if data and 'items' in data and isinstance(data['items'], list):
+        if data and isinstance(data, dict):
             valid_items = []
-            for item in data['items']:
-                # Basic validation
-                if all(k in item for k in ('name', 'category', 'description')):
-                    # Normalize category
-                    cat = item['category'].capitalize()
-                    if cat in ['Character', 'Location', 'Item', 'Lore']:
-                        item['category'] = cat
-                        valid_items.append(item)
+            new_items = data.get('items', [])
+            obsolete_names = data.get('obsolete', [])
             
-            print(f"✅ Extracted {len(valid_items)} new Bible items")
-            return valid_items
+            if isinstance(new_items, list):
+                for item in new_items:
+                    # Basic validation
+                    if all(k in item for k in ('name', 'category', 'description')):
+                        # Normalize category
+                        cat = item['category'].capitalize()
+                        if cat in ['Character', 'Location', 'Item', 'Lore']:
+                            item['category'] = cat
+                            valid_items.append(item)
+            
+            print(f"✅ Extracted {len(valid_items)} new Bible items. AI marked {len(obsolete_names)} as obsolete.")
+            return {
+                "items": valid_items,
+                "obsolete": obsolete_names if isinstance(obsolete_names, list) else []
+            }
             
         print("⚠️ Failed to parse valid JSON from model output")
-        return []
+        return {"items": [], "obsolete": []}
         
     except Exception as e:
         print(f"❌ Error generating bible items: {e}")
-        return []
+        return {"items": [], "obsolete": []}
 
 
 @app.post("/stories/{story_id}/bible/generate", response_model=List[BibleItemResponse])
 async def generate_bible_endpoint(
     story_id: str,
+    sync: bool = Query(False),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -1015,6 +1036,9 @@ async def generate_bible_endpoint(
         if not content and story.get('chapters'):
             # Concatenate chapter contents
             content = "\n\n".join([ch.get('content', '') for ch in story.get('chapters', [])])
+        
+        # Strip HTML tags so the AI model gets clean text
+        content = re.sub(r'<[^>]+>', ' ', content).strip()
             
         if not content:
              raise HTTPException(status_code=400, detail="Story has no content to analyze")
@@ -1022,14 +1046,32 @@ async def generate_bible_endpoint(
         # 2. Get existing items to avoid duplicates
         existing_items = await get_bible_items(story_id, user_id)
         
-        # 3. Generate new items
-        new_items_data = await generate_bible_items(content, existing_items)
+        # 3. Generate items (returning new and obsolete)
+        analysis_result = await generate_bible_items(content, existing_items)
+        new_items_data = analysis_result.get('items', [])
+        obsolete_ai_names = [n.lower() for n in analysis_result.get('obsolete', [])]
         
         saved_items = []
-        # 4. Save to Firestore
+        
+        # 4. Handle Deletions (Pruning) if in sync mode
+        if sync:
+            print(f"🗑️ Sync mode enabled. Pruning {len(obsolete_ai_names)} potential obsolete items...")
+            for existing in existing_items:
+                # ONLY delete if:
+                # 1. AI says it's obsolete
+                # 2. It was auto-generated (to protect manual edits)
+                if (existing['name'].lower() in obsolete_ai_names and 
+                    existing.get('autoGenerated', False)):
+                    
+                    print(f"   Deleting obsolete item: {existing['name']}")
+                    await delete_bible_item(story_id, existing['id'], user_id)
+
+        # 5. Save New Items
         for item_data in new_items_data:
             # Check for duplicate names (case-insensitive)
             if not any(existing['name'].lower() == item_data['name'].lower() for existing in existing_items):
+                 # Tag as auto-generated
+                 item_data['autoGenerated'] = True
                  saved = await add_bible_item(story_id, item_data, user_id)
                  saved_items.append(saved)
                  existing_items.append(saved) # Add to local list check
